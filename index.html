@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>试炼回廊 · Canvas 动作回合制战斗</title>
+<title>试炼回廊 · Canvas 动作回合制战斗 V5</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#1a1a2e; background:#0c0c16; padding:14px; }
@@ -19,7 +19,7 @@
   .panel { background:#1c1c30; border:1px solid #2e2e4a; border-radius:10px; padding:12px; margin-bottom:12px; }
   .panel h2 { font-size:12.5px; color:#a8b3ff; margin-bottom:8px; display:flex; justify-content:space-between; }
   .panel h2 .hint { font-size:10px; color:#666; font-weight:400; }
-  .actions { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+  .actions { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:10px; }
   .act { padding:8px 6px; border:1px solid #3a3a5c; border-radius:8px; background:#23233c; color:#dde; cursor:pointer; text-align:center; transition:all .15s; user-select:none; }
   .act:hover:not(.lock) { border-color:#6673ff; background:#2b2b4d; }
   .act.lock { opacity:.35; cursor:not-allowed; }
@@ -43,7 +43,13 @@
   .overlay { position:fixed; inset:0; background:rgba(8,8,18,.88); display:none; align-items:center; justify-content:center; z-index:50; }
   .overlay.show { display:flex; }
   .ov-panel { background:#1c1c30; border:1px solid #4a4a7a; border-radius:14px; padding:24px; max-width:640px; width:92%; max-height:88vh; overflow-y:auto; color:#dde; text-align:center; }
+  .ov-panel.victory { border-color:#ffd76e; animation:pop .55s ease; box-shadow:0 0 60px rgba(255,215,110,.25); }
+  .ov-panel.defeat { border-color:#ff5a5a; animation:fadeRed .9s ease; box-shadow:0 0 60px rgba(255,60,60,.2); }
+  @keyframes pop { 0%{transform:scale(.65);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1)} }
+  @keyframes fadeRed { 0%{opacity:0; box-shadow:inset 0 0 0 rgba(255,40,40,0)} 100%{opacity:1; box-shadow:inset 0 0 120px rgba(255,40,40,.35)} }
   .ov-panel h3 { font-size:20px; color:#e8e8f0; margin-bottom:6px; }
+  .ov-panel h3.win { color:#ffd76e; text-shadow:0 0 18px rgba(255,215,110,.6); }
+  .ov-panel h3.lose { color:#ff8a8a; text-shadow:0 0 18px rgba(255,80,80,.6); }
   .ov-panel .sub { font-size:12px; color:#8a8aa0; margin-bottom:14px; line-height:1.7; }
   .choices { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:12px 0; }
   .choice { background:#23233c; border:1px solid #3a3a5c; border-radius:10px; padding:13px 10px; cursor:pointer; transition:all .15s; }
@@ -69,7 +75,7 @@
 <body>
 <div class="container">
   <h1>试炼回廊 · Canvas 动作回合制战斗</h1>
-  <div class="subtitle">实时战斗动画 · 粒子与屏幕震动 · 五层回廊 + 无尽模式 · 四类敌人 AI · 遗物三选一 · 魂加点 · 白盒公式 · 帧级日志 · 全程序化绘制零图片资源</div>
+  <div class="subtitle">十层回廊 · 各层 BOSS 独有技能 · 意图预告 · 精英词缀无尽模式 · 元素克制 · 站位 · 状态叠层 · 连击终结技 · 全程序化绘制</div>
 
   <div class="topbar">
     <span>回廊层数：<b id="ui-floor">-</b></span>
@@ -81,13 +87,13 @@
     <div class="main">
       <canvas id="cv" width="960" height="400"></canvas>
       <div class="actions" id="actions">
-        <div class="act" data-k="light"><div class="nm">轻击</div><div class="cost">体力 25</div><div class="desc">1.0× · 削韧 10 · 快</div></div>
-        <div class="act" data-k="heavy"><div class="nm">重击</div><div class="cost">体力 40</div><div class="desc">1.8× · 削韧 25 · 慢</div></div>
-        <div class="act" data-k="guard"><div class="nm">格挡</div><div class="cost">回复 15 体力</div><div class="desc">减伤 70% · 荆棘反弹</div></div>
-        <div class="act" data-k="dodge"><div class="nm">闪避</div><div class="cost">体力 20</div><div class="desc">完全规避 · 反击必暴</div></div>
+        <div class="act" data-k="light"><div class="nm">轻击</div><div class="cost">体力 25</div><div class="desc">火 · 双段斩 · 削韧10</div></div>
+        <div class="act" data-k="heavy"><div class="nm">重击</div><div class="cost">体力 40</div><div class="desc">雷 · 跳劈 · 削韧25</div></div>
+        <div class="act" data-k="guard"><div class="nm">格挡</div><div class="cost">回复 15 体力</div><div class="desc">减伤70% · 荆棘反弹</div></div>
+        <div class="act" data-k="dodge"><div class="nm">闪避</div><div class="cost">体力 20</div><div class="desc">规避 · 反击必暴</div></div>
         <div class="act" data-k="riposte" id="btn-riposte" style="display:none"><div class="nm" style="color:#c792ea">处决</div><div class="cost">韧性已破</div><div class="desc">3.0× 无视防御</div></div>
         <div class="act" data-k="potion"><div class="nm">药剂</div><div class="cost" id="pot-cost">剩 2</div><div class="desc">恢复 35 HP</div></div>
-        <div class="act" onclick="switchStance()"><div class="nm">站位</div><div class="cost" id="stance-cost">中立</div><div class="desc">切换战斗姿态</div></div>
+        <div class="act" onclick="switchStance()"><div class="nm">站位</div><div class="cost" id="stance-cost">中立</div><div class="desc">前压/后撤切换</div></div>
         <div class="act" data-k="finisher" id="btn-finisher" style="display:none"><div class="nm" style="color:#ffd76e">终结技</div><div class="cost">连击 3 层</div><div class="desc">4× 必暴击</div></div>
       </div>
     </div>
@@ -96,8 +102,8 @@
       <div class="panel">
         <h2>我的 Build <span class="hint">加点与遗物</span></h2>
         <div class="build-line"><span>攻击 / 生命 / 体力</span><b id="bl-stats">-</b></div>
-        <div class="build-line"><span>站位</span><b id="bl-stance">中立</b></div>
-        <div class="build-line"><span>连击</span><b id="bl-combo">0</b></div>
+        <div class="build-line"><span>站位 / 连击</span><b id="bl-stance">中立 / 0</b></div>
+        <div class="build-line"><span>我的异常</span><b id="bl-pdeb">无</b></div>
         <div class="build-line"><span>药剂持有</span><b id="bl-pot">-</b></div>
         <div class="relic-tags" id="bl-relics"></div>
       </div>
@@ -119,41 +125,56 @@
       <div class="panel">
         <h2>伤害公式</h2>
         <div class="help" style="margin:0;font-size:10.5px;line-height:1.8">
-          伤害 = <span style="color:#c792ea">ATK×倍率×防御减免×暴击×浮动×元素克制</span><br>
-          暴击 1.5×（闪避反击可 2.0×）· 格挡 ×0.3 · 护盾 ×0.5 · 蓄力目标受伤 +50%<br>
-          韧性破 → 处决 3.0× 无视防御 · 连击满3层 → 终结技 4.0×<br>
-          站位：前压命中+15%受伤+20% / 后撤命中-10%受伤-20%<br>
-          灼烧-8HP/回合 · 破防防御-50% · 易伤受伤+30%
+          伤害 = <span style="color:#c792ea">ATK×倍率×防御减免×暴击×浮动×克制</span><br>
+          敌人头顶有<b style="color:#ffd76e">意图预告</b>：攻击/蓄力/防御/特殊——防御回合削韧减半，适合上增益<br>
+          轻击=火(灼烧) 重击=雷(破防) 处决系=暗(易伤) · 弱点命中 1.5×<br>
+          韧性破 → 倒地1回合+处决 3.0× · 连击满3 → 终结技 4.0×<br>
+          站位：前压命中+15%受伤+20% / 后撤命中-10%受伤-20%
         </div>
       </div>
     </div>
   </div>
 
-  <div class="footer">试炼回廊 · 独立设计的肉鸽战斗游戏 · 角色与特效全部 Canvas 程序化绘制 · github.com/46bzvs7m64-gif/combat-demo</div>
+  <div class="footer">试炼回廊 V5 · 十层各具独有技能的 BOSS · 意图预告与精英词缀 · github.com/46bzvs7m64-gif/combat-demo</div>
 </div>
 
 <div class="overlay" id="overlay"><div class="ov-panel" id="ov-panel"></div></div>
 
 <script>
 "use strict";
-/* ==================== 配置 ==================== */
+/* ==================== 敌人总表（含各层独有技能标记） ==================== */
 const ENEMIES = {
-  guard:     { name:"回廊守卫", hp:150, atk:10, def:25, poise:50, desc:"半血狂暴" },
-  berserker: { name:"血狂战士", hp:120, atk:13, def:10, poise:40, desc:"低血嗜血双动" },
-  sorcerer:  { name:"咒术师",   hp:130, atk:12, def:15, poise:60, shield:.22, desc:"护盾+蓄力" },
-  lord:      { name:"回廊之主", hp:200, atk:13, def:25, poise:90, desc:"三阶段" },
+  guard:    { name:"回廊守卫",   hp:170, atk:10, def:25, poise:55,  desc:"标准重甲" },
+  berserker:{ name:"血狂战士",   hp:140, atk:13, def:10, poise:40,  desc:"低血嗜血双动" },
+  sorcerer: { name:"咒术师",     hp:150, atk:12, def:15, poise:65,  shield:.22, desc:"护盾+蓄力" },
+  butcher:  { name:"碎铠屠夫",   hp:190, atk:14, def:20, poise:70,  debuffOnHit:true, desc:"攻击附带碎甲" },
+  lord:     { name:"回廊之主",   hp:260, atk:13, def:25, poise:95,  desc:"三阶段王权" },
+  bloodfang:{ name:"血牙领主",   hp:200, atk:15, def:18, poise:60,  lifesteal:.4, desc:"攻击吸血 40%" },
+  voidmage: { name:"虚空咒师",   hp:210, atk:14, def:18, poise:70,  shield:.25, blink:.25, desc:"闪现规避+双蓄力" },
+  golem:    { name:"磐岩傀儡",   hp:230, atk:12, def:40, poise:150, thorns:.22, desc:"反伤甲+极高韧性" },
+  shadow:   { name:"影刃刺客",   hp:170, atk:16, def:15, poise:50,  blink:.2, swift:true, desc:"迅捷追击+闪避" },
+  heart:    { name:"回廊之心",   hp:330, atk:15, def:28, poise:120, lifesteal:.25, desc:"四阶段·回廊意志" },
 };
+const ENDLESS_POOL = ["guard","berserker","sorcerer","butcher","bloodfang","voidmage","golem","shadow","lord"];
+const AFFIXES = [
+  { id:"fury",   name:"狂暴",   desc:"伤害 +30%" },
+  { id:"regen",  name:"再生",   desc:"每回合回复 3% 生命" },
+  { id:"thorn",  name:"荆棘",   desc:"反伤 25%" },
+  { id:"swift",  name:"迅捷",   desc:"35% 追击" },
+  { id:"shielded", name:"壁垒", desc:"获得 20% 护盾" },
+];
+/* 十层固定编排 */
+const FLOORS = [null,"guard","berserker","sorcerer","butcher","lord","bloodfang","voidmage","golem","shadow","heart"];
+const floorKey = f => f<=10 ? FLOORS[f] : ENDLESS_POOL[(f-11)%ENDLESS_POOL.length];
 
 const ELEMENTS = {
-  fire:  { name:"火", color:"#ff7a4a", weakBonus:1.5 },
+  fire:   { name:"火", color:"#ff7a4a", weakBonus:1.5 },
   thunder:{ name:"雷", color:"#ffd76e", weakBonus:1.5 },
-  dark:  { name:"暗", color:"#c792ea", weakBonus:1.5 },
+  dark:   { name:"暗", color:"#c792ea", weakBonus:1.5 },
 };
 const WEAKNESS = {
-  guard:     "thunder",
-  berserker: "fire",
-  sorcerer:  "dark",
-  lord:      "any",
+  guard:"thunder", berserker:"fire", sorcerer:"dark", butcher:"thunder", lord:"any",
+  bloodfang:"fire", voidmage:"dark", golem:"thunder", shadow:"fire", heart:"any",
 };
 const DEBUFFS = {
   burn:   { name:"灼烧", max:3, dot:8,   color:"#ff7a4a" },
@@ -165,14 +186,6 @@ const STANCES = {
   aggro:   { name:"前压", hit:0.15, taken:1.2 },
   def:     { name:"后撤", hit:-0.1, taken:0.8 },
 };
-
-const FLOOR_PLAN = f =>
-  f===1 ? ["guard"] :
-  f===2 ? ["guard","berserker"] :
-  f===3 ? ["berserker","sorcerer"] :
-  f===4 ? ["guard","berserker","sorcerer"] :
-  f===5 ? ["lord"] :
-  ["guard","berserker","sorcerer"];
 const RELICS = [
   { id:"eagle",  name:"鹰眼徽章", desc:"暴击率 +12%" },
   { id:"razor",  name:"剃刀",     desc:"闪避反击暴击倍率 2.0×" },
@@ -189,8 +202,8 @@ const UP_INFO = {
   st:  { label:"呼吸法 · 体力 +15", base:8,  step:5 },
   pot: { label:"行囊 · 药剂 +1",    base:15, step:10, max:2 },
 };
-const RUN_KEY = "corridor_save_v3";
-const FLOOR_SOULS = f => 8 + f*4;
+const RUN_KEY = "corridor_save_v5";
+const FLOOR_SOULS = f => 10 + f*5;
 
 /* ==================== 存档与全局 ==================== */
 let meta = null, S = null, E = null;
@@ -207,14 +220,15 @@ const cv = document.getElementById("cv"), cx = cv.getContext("2d");
 const W = cv.width, H = cv.height;
 const P_BASE = { x:225, y:318 }, E_BASE = { x:735, y:318 };
 const V = {
-  p:{ ox:0, flash:0, ghost:0, block:0, visible:1 },
+  p:{ ox:0, oy:0, flash:0, ghost:0, block:0, visible:1 },
   e:{ ox:0, flash:0, visible:1, aura:0, charge:0 },
-  slash:{ show:0, x:0, y:0, flip:1 },
+  slash:{ show:0, x:0, y:0, flip:1, cross:0 },
+  ring:{ show:0, x:0, y:0, r:0 },
   proj:{ show:0, x:0, y:0, r:6 },
-  shake:0, t:0,
+  shake:0, fullflash:0, dim:0, t:0,
 };
 let particles = [], floaters = [];
-const Dp = { hp:100, st:100 }, De = { hp:1, poise:1, shd:0 }; // 平滑显示值
+const Dp = { hp:110, st:100 }, De = { hp:1, poise:1, shd:0 };
 
 function burst(x, y, n, color, speed, up){
   for (let i=0;i<n;i++){
@@ -222,8 +236,12 @@ function burst(x, y, n, color, speed, up){
     particles.push({ x, y, vx:Math.cos(a)*v, vy:Math.sin(a)*v - (up||0), life:1, dec:0.02+Math.random()*0.025, color, r:2+Math.random()*3 });
   }
 }
-function floatText(x, y, txt, color, size){
-  floaters.push({ x, y, txt, color, size:size||22, life:1 });
+function rain(n, color){
+  for (let i=0;i<n;i++) particles.push({ x:Math.random()*W, y:-10-Math.random()*80, vx:(Math.random()-.5)*.6, vy:1.2+Math.random()*1.6, life:1.6, dec:0.006, color, r:2+Math.random()*2.5, g:0.02 });
+}
+function ringFx(x, y, color){ particles.push({ ring:true, x, y, r:6, vr:5.5, life:1, dec:0.03, color, lw:4 }); }
+function floatText(x, y, txt, color, size, opt){
+  floaters.push(Object.assign({ x, y, txt, color, size:size||22, life:1, age:0 }, opt||{}));
 }
 function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
 
@@ -232,15 +250,12 @@ function drawBG(){
   const g = cx.createLinearGradient(0,0,0,H);
   g.addColorStop(0,"#0b0b15"); g.addColorStop(1,"#151528");
   cx.fillStyle = g; cx.fillRect(0,0,W,H);
-  // 尽头拱门
   cx.fillStyle = "#232348"; rr(W/2-70, 130, 140, 200, 60); cx.fill();
   cx.fillStyle = "rgba(122,95,201,.25)"; rr(W/2-56, 142, 112, 190, 52); cx.fill();
-  // 地板透视
   cx.fillStyle = "#131322"; cx.beginPath(); cx.moveTo(0,330); cx.lineTo(W,330); cx.lineTo(W,H); cx.lineTo(0,H); cx.fill();
   cx.strokeStyle = "rgba(90,90,150,.18)"; cx.lineWidth = 1;
   for (let i=-6;i<=6;i++){ cx.beginPath(); cx.moveTo(W/2+i*40,330); cx.lineTo(W/2+i*150,H); cx.stroke(); }
   for (let y=330;y<H;y+=16){ cx.beginPath(); cx.moveTo(0,y); cx.lineTo(W,y); cx.stroke(); }
-  // 两侧柱与火把
   [[105,1],[855,-1]].forEach(([tx,d])=>{
     cx.fillStyle = "#20203a"; rr(tx-16,120,32,215,4); cx.fill();
     cx.fillStyle = "#181830"; rr(tx-22,100,44,26,4); cx.fill();
@@ -252,17 +267,16 @@ function drawBG(){
     cx.fillStyle = "#ffd76e"; cx.beginPath();
     cx.moveTo(tx, fy-6-fl); cx.quadraticCurveTo(tx+6, fy-2, tx, fy+2); cx.quadraticCurveTo(tx-6, fy-2, tx, fy-6-fl); cx.fill();
   });
-  // 暗角
   const vg = cx.createRadialGradient(W/2,H/2,220,W/2,H/2,620);
   vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,.5)");
   cx.fillStyle = vg; cx.fillRect(0,0,W,H);
 }
 
-/* ---- 角色（全程序化） ---- */
+/* ---- 角色 ---- */
 function shadow(x,y,w){ cx.fillStyle="rgba(0,0,0,.45)"; cx.beginPath(); cx.ellipse(x,y+4,w,7,0,0,7); cx.fill(); }
 function drawPlayer(x,y){
   const b = Math.sin(V.t/480)*2.5;
-  y += b;
+  y += b - V.p.oy;
   const gx = x - V.p.ghost*70;
   if (V.p.ghost > 0.02){ cx.globalAlpha = V.p.ghost*0.5; drawPlayerBody(gx,y); cx.globalAlpha = 1; }
   drawPlayerBody(x,y);
@@ -273,21 +287,16 @@ function drawPlayer(x,y){
 }
 function drawPlayerBody(x,y){
   const f = V.p.flash;
-  // 披风
   cx.fillStyle = f>0.05?`rgba(${200+f*55|0},${60+f*100|0},${70+f*100|0},1)`:"#27314f";
   cx.beginPath(); cx.moveTo(x-4,y-92); cx.quadraticCurveTo(x-30,y-60,x-20+Math.sin(V.t/300)*4,y-8);
   cx.lineTo(x-2,y-14); cx.quadraticCurveTo(x-8,y-60,x+4,y-90); cx.fill();
-  // 腿
   cx.strokeStyle = "#2c3550"; cx.lineWidth = 7; cx.lineCap = "round";
   cx.beginPath(); cx.moveTo(x-6,y-36); cx.lineTo(x-10,y-2); cx.moveTo(x+8,y-36); cx.lineTo(x+12,y-2); cx.stroke();
-  // 躯干
   cx.fillStyle = f>0.05?"#fff":"#3b4a75"; rr(x-13,y-78,26,44,9); cx.fill();
   cx.fillStyle = "#2c3550"; rr(x-13,y-56,26,8,3); cx.fill();
-  // 头+兜帽
   cx.fillStyle = f>0.05?"#fff":"#46588c"; cx.beginPath(); cx.arc(x,y-88,12,0,7); cx.fill();
   cx.fillStyle = "#1c2338"; cx.beginPath(); cx.arc(x,y-90,12.5,Math.PI*0.9,Math.PI*2.1); cx.fill();
   cx.fillStyle = "#7fd8ff"; cx.fillRect(x+2,y-90,5,3);
-  // 剑
   cx.save(); cx.translate(x+14,y-52); cx.rotate(-0.5+Math.sin(V.t/480)*0.06);
   cx.fillStyle = "#c8d2e8"; cx.fillRect(-2,-58,4,58);
   cx.fillStyle = "#8a93ad"; cx.fillRect(-8,-4,16,4); cx.fillRect(-2,0,4,10);
@@ -301,14 +310,15 @@ function drawEnemy(x,y){
     ag.addColorStop(0,`rgba(255,70,70,${0.35*V.e.aura})`); ag.addColorStop(1,"rgba(255,70,70,0)");
     cx.fillStyle = ag; cx.beginPath(); cx.arc(x,y-70,110,0,7); cx.fill();
   }
-  const sc = E.type==="lord"?1.32 : E.type==="guard"?1.08 : 1;
-  cx.save(); cx.translate(x,y); cx.scale(sc,sc); cx.translate(-x,-y);
+  const big = { lord:1.32, golem:1.38, heart:1.4, butcher:1.15 }[E.type] || 1.08;
+  cx.save(); cx.translate(x,y); cx.scale(big,big); cx.translate(-x,-y);
   const f = V.e.flash, b = Math.sin(V.t/420 + 2)*2.5;
   y += b;
-  if (E.type==="guard") drawGuard(x,y,f);
-  else if (E.type==="berserker") drawBerserker(x,y,f);
-  else if (E.type==="sorcerer") drawSorcerer(x,y,f);
-  else drawLord(x,y,f);
+  if (E.type==="guard"||E.type==="butcher"||E.type==="golem") drawGuard(x,y,f,E.type);
+  else if (E.type==="berserker"||E.type==="bloodfang"||E.type==="shadow") drawBerserker(x,y,f,E.type);
+  else if (E.type==="sorcerer"||E.type==="voidmage") drawSorcerer(x,y,f,E.type);
+  else if (E.type==="lord") drawLord(x,y,f);
+  else drawHeart(x,y,f);
   cx.restore();
   if (V.e.charge > 0.03){
     const oy = y-120, r = 6+V.e.charge*16;
@@ -317,31 +327,36 @@ function drawEnemy(x,y){
     cx.fillStyle = og; cx.beginPath(); cx.arc(x,oy,r+8,0,7); cx.fill();
   }
 }
-function eLimbs(x,y,f,c1,c2){ // 通用腿
-  cx.strokeStyle = c2; cx.lineWidth = 8; cx.lineCap = "round";
-  cx.beginPath(); cx.moveTo(x-8,y-34); cx.lineTo(x-12,y-2); cx.moveTo(x+8,y-34); cx.lineTo(x+12,y-2); cx.stroke();
-}
-function drawGuard(x,y,f){
-  eLimbs(x,y,f,"","#3a4152");
-  cx.fillStyle = f>0.05?"#fff":"#545e78"; rr(x-18,y-84,36,50,10); cx.fill();
-  cx.fillStyle = "#3a4152"; rr(x-18,y-62,36,9,3); cx.fill();
-  cx.fillStyle = f>0.05?"#fff":"#626d8c"; cx.beginPath(); cx.arc(x,y-94,13,0,7); cx.fill();
+function eLimbs(x,y,c2){ cx.strokeStyle = c2; cx.lineWidth = 8; cx.lineCap = "round";
+  cx.beginPath(); cx.moveTo(x-8,y-34); cx.lineTo(x-12,y-2); cx.moveTo(x+8,y-34); cx.lineTo(x+12,y-2); cx.stroke(); }
+function drawGuard(x,y,f,kind){
+  const body = kind==="golem" ? ["#6a6a58","#4a4a3c"] : kind==="butcher" ? ["#6e3a3a","#4a2424"] : ["#545e78","#3a4152"];
+  eLimbs(x,y,body[1]);
+  cx.fillStyle = f>0.05?"#fff":body[0]; rr(x-18,y-84,36,50,10); cx.fill();
+  cx.fillStyle = body[1]; rr(x-18,y-62,36,9,3); cx.fill();
+  cx.fillStyle = f>0.05?"#fff":body[0]; cx.beginPath(); cx.arc(x,y-94,13,0,7); cx.fill();
   cx.fillStyle = "#181c28"; cx.fillRect(x-9,y-97,18,4);
-  cx.fillStyle = "#ff9c5a"; cx.fillRect(x-6,y-96,4,2); cx.fillRect(x+3,y-96,4,2);
-  // 大剑拄地
-  cx.save(); cx.translate(x+24,y-46); cx.rotate(0.28);
-  cx.fillStyle = "#aeb8d0"; cx.fillRect(-3,-74,6,74);
-  cx.fillStyle = "#6c7690"; cx.fillRect(-11,-6,22,5); cx.fillRect(-3,-1,6,14);
-  cx.restore();
-  // 肩甲
-  cx.fillStyle = "#6c7690"; cx.beginPath(); cx.arc(x-17,y-80,9,0,7); cx.arc(x+17,y-80,9,0,7); cx.fill();
+  cx.fillStyle = kind==="golem"?"#8affc0":kind==="butcher"?"#ff5a5a":"#ff9c5a";
+  cx.fillRect(x-6,y-96,4,2); cx.fillRect(x+3,y-96,4,2);
+  if (kind==="golem"){
+    cx.fillStyle = "#8a8a74";
+    for (let i=0;i<4;i++){ cx.beginPath(); cx.arc(x-12+i*8, y-70-(i%2)*14, 5, 0, 7); cx.fill(); }
+    cx.fillStyle = "#5a5a4a"; rr(x-26,y-66,52,10,4); cx.fill();
+  } else {
+    cx.fillStyle = "#6c7690"; cx.beginPath(); cx.arc(x-17,y-80,9,0,7); cx.arc(x+17,y-80,9,0,7); cx.fill();
+    cx.save(); cx.translate(x+24,y-46); cx.rotate(0.28);
+    cx.fillStyle = kind==="butcher"?"#d0b8b8":"#aeb8d0"; cx.fillRect(kind==="butcher"?-6:-3,kind==="butcher"?-64:-74,kind==="butcher"?12:6,kind==="butcher"?64:74);
+    cx.fillStyle = "#6c7690"; cx.fillRect(-11,-6,22,5); cx.fillRect(-3,-1,6,14);
+    cx.restore();
+  }
 }
-function drawBerserker(x,y,f){
-  eLimbs(x,y,f,"","#4a2626");
-  cx.fillStyle = f>0.05?"#fff":"#7a3030"; rr(x-15,y-80,30,46,10); cx.fill();
-  cx.fillStyle = "#5a2222"; cx.beginPath(); cx.moveTo(x-15,y-80); cx.lineTo(x,y-96); cx.lineTo(x+15,y-80); cx.fill();
-  cx.fillStyle = f>0.05?"#fff":"#8a3a3a"; cx.beginPath(); cx.arc(x,y-92,12,0,7); cx.fill();
-  cx.fillStyle = "#ffe08a"; cx.fillRect(x-7,y-94,4,3); cx.fillRect(x+3,y-94,4,3);
+function drawBerserker(x,y,f,kind){
+  const body = kind==="bloodfang" ? ["#6a1a3a","#4a1228"] : kind==="shadow" ? ["#2a2a44","#1c1c30"] : ["#7a3030","#5a2222"];
+  eLimbs(x,y,body[1]);
+  cx.fillStyle = f>0.05?"#fff":body[0]; rr(x-15,y-80,30,46,10); cx.fill();
+  cx.fillStyle = body[1]; cx.beginPath(); cx.moveTo(x-15,y-80); cx.lineTo(x,y-96); cx.lineTo(x+15,y-80); cx.fill();
+  cx.fillStyle = f>0.05?"#fff":body[0]; cx.beginPath(); cx.arc(x,y-92,12,0,7); cx.fill();
+  cx.fillStyle = kind==="shadow"?"#c792ea":"#ffe08a"; cx.fillRect(x-7,y-94,4,3); cx.fillRect(x+3,y-94,4,3);
   cx.strokeStyle = "#c8d2e8"; cx.lineWidth = 4;
   [[-1,-1],[1,1]].forEach(([sx,rot])=>{
     cx.save(); cx.translate(x+sx*20,y-52); cx.rotate(rot*0.5);
@@ -350,38 +365,55 @@ function drawBerserker(x,y,f){
     cx.restore();
   });
 }
-function drawSorcerer(x,y,f){
-  cx.fillStyle = f>0.05?"#fff":"#3d2a5e";
+function drawSorcerer(x,y,f,kind){
+  const body = kind==="voidmage" ? ["#1e2a5e","#141c42"] : ["#3d2a5e","#2a1c42"];
+  cx.fillStyle = f>0.05?"#fff":body[0];
   cx.beginPath(); cx.moveTo(x,y-108); cx.lineTo(x+24,y-2); cx.lineTo(x-24,y-2); cx.closePath(); cx.fill();
-  cx.fillStyle = "#2a1c42"; cx.beginPath(); cx.moveTo(x,y-108); cx.lineTo(x+13,y-72); cx.lineTo(x-13,y-72); cx.fill();
-  cx.fillStyle = "#b3a1e8"; cx.fillRect(x-6,y-92,4,2.5); cx.fillRect(x+2,y-92,4,2.5);
+  cx.fillStyle = body[1]; cx.beginPath(); cx.moveTo(x,y-108); cx.lineTo(x+13,y-72); cx.lineTo(x-13,y-72); cx.fill();
+  cx.fillStyle = kind==="voidmage"?"#8ab3ff":"#b3a1e8"; cx.fillRect(x-6,y-92,4,2.5); cx.fillRect(x+2,y-92,4,2.5);
   cx.save(); cx.translate(x-24,y-40); cx.rotate(0.15);
   cx.strokeStyle = "#5a4a2a"; cx.lineWidth = 4; cx.beginPath(); cx.moveTo(0,10); cx.lineTo(0,-64); cx.stroke();
-  cx.fillStyle = "#c792ea"; cx.beginPath(); cx.arc(0,-70,6+Math.sin(V.t/200)*1.5,0,7); cx.fill();
+  cx.fillStyle = kind==="voidmage"?"#6a9cff":"#c792ea"; cx.beginPath(); cx.arc(0,-70,6+Math.sin(V.t/200)*1.5,0,7); cx.fill();
   cx.restore();
 }
 function drawLord(x,y,f){
-  // 披风
   cx.fillStyle = "#3a1030";
   cx.beginPath(); cx.moveTo(x-6,y-96); cx.quadraticCurveTo(x-42,y-64,x-30,y-4); cx.lineTo(x-4,y-12); cx.quadraticCurveTo(x-14,y-64,x+4,y-94); cx.fill();
-  eLimbs(x,y,f,"","#2c2438");
+  eLimbs(x,y,"#2c2438");
   cx.fillStyle = f>0.05?"#fff":"#463a5e"; rr(x-19,y-86,38,52,11); cx.fill();
   cx.fillStyle = "#c792ea"; rr(x-19,y-58,38,7,3); cx.fill();
   cx.fillStyle = f>0.05?"#fff":"#544674"; cx.beginPath(); cx.arc(x,y-98,14,0,7); cx.fill();
   cx.fillStyle = "#181420"; cx.fillRect(x-10,y-102,20,5);
   cx.fillStyle = "#ff5a7a"; cx.fillRect(x-7,y-101,5,3); cx.fillRect(x+3,y-101,5,3);
-  // 王冠
   cx.fillStyle = "#ffd76e";
   cx.beginPath(); cx.moveTo(x-12,y-108); cx.lineTo(x-12,y-118); cx.lineTo(x-6,y-111); cx.lineTo(x,y-121); cx.lineTo(x+6,y-111); cx.lineTo(x+12,y-118); cx.lineTo(x+12,y-108); cx.closePath(); cx.fill();
-  // 巨剑
   cx.save(); cx.translate(x+27,y-48); cx.rotate(0.22);
   cx.fillStyle = "#d8e0f0"; cx.fillRect(-4,-92,8,92);
   cx.fillStyle = "#8a7aa8"; cx.fillRect(-14,-8,28,6); cx.fillRect(-4,-2,8,16);
   cx.restore();
   cx.fillStyle = f>0.05?"#fff":"#6c5a94"; cx.beginPath(); cx.arc(x-19,y-82,10,0,7); cx.arc(x+19,y-82,10,0,7); cx.fill();
 }
+function drawHeart(x,y,f){
+  const ph = E.phase||1;
+  cx.fillStyle = ph>=3 ? "#4a0e2a" : "#38102e";
+  cx.beginPath(); cx.moveTo(x,y-118); cx.quadraticCurveTo(x+56,y-70,x+44,y-6);
+  cx.quadraticCurveTo(x,y+10,x-44,y-6); cx.quadraticCurveTo(x-56,y-70,x,y-118); cx.fill();
+  cx.strokeStyle = "#c792ea"; cx.lineWidth = 3;
+  cx.beginPath(); cx.moveTo(x,y-118); cx.quadraticCurveTo(x+56,y-70,x+44,y-6); cx.stroke();
+  cx.beginPath(); cx.moveTo(x,y-118); cx.quadraticCurveTo(x-56,y-70,x-44,y-6); cx.stroke();
+  const pulse = 1 + Math.sin(V.t/260)*0.12;
+  const hg = cx.createRadialGradient(x,y-62,4,x,y-62,26*pulse);
+  hg.addColorStop(0, ph>=3?"#ffb0c8":"#ff8aa8"); hg.addColorStop(.6, ph>=3?"#ff3a6a":"#c92a5a"); hg.addColorStop(1,"rgba(120,20,50,0)");
+  cx.fillStyle = hg; cx.beginPath(); cx.arc(x,y-62,26*pulse,0,7); cx.fill();
+  cx.fillStyle = "#ffd76e";
+  [[-16,-98],[16,-98],[0,-116]].forEach(([ox,oy])=>{ cx.beginPath(); cx.moveTo(x+ox,y+oy+6); cx.lineTo(x+ox,y+oy); cx.lineTo(x+ox+4,y+oy+7); cx.fill(); });
+  if (ph>=2){
+    cx.strokeStyle = `rgba(255,90,120,${.4+.3*Math.sin(V.t/150)})`; cx.lineWidth = 2;
+    for (let i=0;i<3;i++){ cx.beginPath(); cx.ellipse(x,y-62,34+i*10,46+i*8,0,0,7); cx.stroke(); }
+  }
+}
 
-/* ---- 头顶血条 ---- */
+/* ---- 头顶条 + 意图预告 ---- */
 function drawBar(x, y, w, ratio, color, label){
   cx.fillStyle = "rgba(10,10,22,.75)"; rr(x-w/2-2, y-2, w+4, 12, 5); cx.fill();
   cx.fillStyle = "#2a2a44"; rr(x-w/2, y, w, 8, 4); cx.fill();
@@ -389,50 +421,64 @@ function drawBar(x, y, w, ratio, color, label){
   cx.fillStyle = "#e8e8f0"; cx.font = "9px Microsoft YaHei"; cx.textAlign = "center";
   cx.fillText(label, x, y-5);
 }
+function intentText(){
+  const it = E.intent; if (!it) return "";
+  if (it.type === "atk") return `⚔ ${it.name} ~${Math.round(E.atk*it.mult*(E.affix==="fury"?1.3:1))}`;
+  if (it.type === "charge") return "✦ 正在蓄力…";
+  if (it.type === "defend") return "🛡 防御姿态";
+  if (it.type === "debuff") return `☠ ${it.name}`;
+  if (it.type === "drain") return `⚔ ${it.name} 吸血`;
+  return "";
+}
 function drawHUD(){
   if (!S || !E) return;
   const px = P_BASE.x + V.p.ox, ex = E_BASE.x + V.e.ox;
+  const it = intentText();
+  if (it){ cx.font = "bold 11px Microsoft YaHei"; cx.fillStyle = "#ffd76e"; cx.fillText("下回合 ▸ " + it, ex, 92); }
   drawBar(px, 158, 150, Dp.hp/playerMaxHp(), "#e04a4a", `玩家 ${Math.ceil(Dp.hp)}/${playerMaxHp()}`);
   drawBar(px, 176, 150, Dp.st/playerMaxSt(), "#3f9e5f", `体力 ${Math.floor(Dp.st)}`);
+  let pl = "";
+  if (S.p.debuffs.burn>0) pl += `灼烧${S.p.debuffs.burn} `;
+  if (S.p.debuffs.breakd>0) pl += `破防${S.p.debuffs.breakd} `;
+  if (S.p.debuffs.vuln>0) pl += `易伤${S.p.debuffs.vuln} `;
+  if (pl){ cx.font = "bold 9px Microsoft YaHei"; cx.fillStyle = "#ff7a4a"; cx.fillText(pl, px, 138); }
   drawBar(ex, 128, 165, De.hp/E.maxhp, "#e04a4a", `${E.name}  ${Math.ceil(De.hp)}/${E.maxhp}`);
   drawBar(ex, 146, 165, De.poise/E.maxpoise, "#d9a441", `韧性 ${Math.ceil(De.poise)}${E.poise===0?"  → 可处决":""}`);
   if (E.maxshield) drawBar(ex, 164, 165, De.shd/E.maxshield, "#7a5fc9", `护盾 ${Math.ceil(De.shd)}`);
-  // Debuff 标签
-  let debuffTxt = "";
-  if (E.debuffs.burn > 0) debuffTxt += `灼烧${E.debuffs.burn} `;
-  if (E.debuffs.breakd > 0) debuffTxt += `破防${E.debuffs.breakd} `;
-  if (E.debuffs.vuln > 0) debuffTxt += `易伤${E.debuffs.vuln} `;
-  if (debuffTxt){ cx.font = "bold 9px Microsoft YaHei"; cx.fillStyle = "#ff7a4a"; cx.fillText(debuffTxt, ex, 92); }
+  let db = "";
+  if (E.debuffs.burn>0) db += `灼烧${E.debuffs.burn} `;
+  if (E.debuffs.breakd>0) db += `破防${E.debuffs.breakd} `;
+  if (E.debuffs.vuln>0) db += `易伤${E.debuffs.vuln} `;
+  if (E.affix) db += `[${E.affix}] `;
+  if (db){ cx.font = "bold 9px Microsoft YaHei"; cx.fillStyle = "#ff7a4a"; cx.fillText(db, ex, 108); }
   cx.font = "bold 10px Microsoft YaHei";
-  cx.fillStyle = E.phase===1 ? "#a8b3ff" : "#ff9c9c";
-  cx.fillText(E.phase===1 ? (E.type==="lord"?"第 1 阶段":E.desc) : (E.phase===3?"最终阶段":"阶段 2 · 狂暴"), ex, 108);
+  cx.fillStyle = E.phase>=3 ? "#ff9c9c" : E.phase===2 ? "#ffd76e" : "#a8b3ff";
+  const phName = { 1:"第 1 阶段", 2:"阶段 2 · 狂暴", 3:"阶段 3 · 临界", 4:"最终阶段" }[E.phase] || E.desc;
+  cx.fillText(meta.floor===10||E.type==="lord"||E.type==="heart" ? phName : E.desc, ex, 78);
 }
 
-/* ---- 主渲染循环 ---- */
+/* ---- 主循环 ---- */
 let lastT = 0;
 function loop(ts){
   const dt = Math.min(50, ts - lastT || 16); lastT = ts; V.t += dt;
   tickQueue(dt);
-  // 血条平滑插值（显示层追赶真实值）
   if (S && E){
     const k = Math.min(1, dt * 0.012);
-    Dp.hp  += (S.p.hp  - Dp.hp)  * k;
-    Dp.st  += (S.p.st  - Dp.st)  * k;
-    De.hp   += (E.hp     - De.hp)   * k;
-    De.poise+= (E.poise  - De.poise)* k;
-    De.shd  += (E.shield - De.shd)  * k;
+    Dp.hp += (S.p.hp - Dp.hp) * k; Dp.st += (S.p.st - Dp.st) * k;
+    De.hp += (E.hp - De.hp) * k; De.poise += (E.poise - De.poise) * k; De.shd += (E.shield - De.shd) * k;
   }
   cx.clearRect(0,0,W,H);
   cx.save();
   if (V.shake > 0.5){ cx.translate((Math.random()-0.5)*V.shake, (Math.random()-0.5)*V.shake); V.shake *= Math.pow(0.9, dt/16); } else V.shake = 0;
   V.p.flash = Math.max(0, V.p.flash - dt*0.004);
   V.e.flash = Math.max(0, V.e.flash - dt*0.004);
+  V.dim = Math.max(0, V.dim - dt*0.002);
+  V.fullflash = Math.max(0, V.fullflash - dt*0.004);
   if (S && S.p && !S.p.guard) V.p.block = Math.max(0, V.p.block - dt*0.005);
   drawBG();
   if (S && E){
     const px = P_BASE.x + V.p.ox, ex = E_BASE.x + V.e.ox;
     shadow(px, P_BASE.y, 26); shadow(ex, E_BASE.y, 30);
-    // 弹射物
     if (V.proj.show > 0){
       const pg = cx.createRadialGradient(V.proj.x,V.proj.y,1,V.proj.x,V.proj.y,V.proj.r+6);
       pg.addColorStop(0,"rgba(220,150,255,.95)"); pg.addColorStop(1,"rgba(140,80,255,0)");
@@ -440,27 +486,45 @@ function loop(ts){
     }
     drawEnemy(ex, E_BASE.y);
     drawPlayer(px, P_BASE.y);
-    // 斩击弧
     if (V.slash.show > 0.02){
       const s = V.slash;
       cx.strokeStyle = `rgba(255,255,255,${s.show})`; cx.lineWidth = 5; cx.lineCap = "round";
       cx.beginPath(); cx.arc(s.x, s.y, 46, s.flip>0 ? -1.4 : Math.PI-1.6, s.flip>0 ? 1.0 : Math.PI+0.8); cx.stroke();
       cx.strokeStyle = `rgba(255,220,140,${s.show*0.7})`; cx.lineWidth = 2;
       cx.beginPath(); cx.arc(s.x, s.y, 38, s.flip>0 ? -1.2 : Math.PI-1.4, s.flip>0 ? 0.8 : Math.PI+0.6); cx.stroke();
+      if (s.cross > 0.02){
+        cx.strokeStyle = `rgba(199,146,234,${s.cross})`; cx.lineWidth = 6;
+        cx.beginPath(); cx.moveTo(s.x-52, s.y-52); cx.lineTo(s.x+52, s.y+52); cx.stroke();
+        cx.beginPath(); cx.moveTo(s.x+52, s.y-52); cx.lineTo(s.x-52, s.y+52); cx.stroke();
+      }
+    }
+    if (V.ring.show > 0.02){
+      cx.strokeStyle = `rgba(255,255,255,${V.ring.show})`; cx.lineWidth = 5;
+      cx.beginPath(); cx.arc(V.ring.x, V.ring.y, V.ring.r, 0, 7); cx.stroke();
     }
     drawHUD();
   }
-  // 粒子
+  if (V.dim > 0.01){ cx.fillStyle = `rgba(10,4,20,${V.dim*0.6})`; cx.fillRect(0,0,W,H); }
+  if (V.fullflash > 0.01){ cx.fillStyle = `rgba(255,250,230,${V.fullflash*0.8})`; cx.fillRect(0,0,W,H); }
   particles = particles.filter(p => p.life > 0);
-  particles.forEach(p => { p.x+=p.vx*dt/16; p.y+=p.vy*dt/16; p.vy+=0.12*dt/16; p.life-=p.dec*dt/16;
-    cx.globalAlpha = Math.max(0,p.life); cx.fillStyle = p.color;
-    cx.beginPath(); cx.arc(p.x,p.y,p.r,0,7); cx.fill(); cx.globalAlpha = 1; });
-  // 浮动数字
+  particles.forEach(p => {
+    if (p.ring){ p.r += p.vr*dt/16; p.life -= p.dec*dt/16;
+      cx.globalAlpha = Math.max(0,p.life); cx.strokeStyle = p.color; cx.lineWidth = p.lw*(p.life);
+      cx.beginPath(); cx.arc(p.x,p.y,p.r,0,7); cx.stroke(); cx.globalAlpha = 1; return; }
+    p.x += p.vx*dt/16; p.y += p.vy*dt/16; if (p.g) p.vy += p.g*dt/16; p.life -= p.dec*dt/16;
+    cx.globalAlpha = Math.max(0,Math.min(1,p.life)); cx.fillStyle = p.color;
+    cx.beginPath(); cx.arc(p.x,p.y,p.r,0,7); cx.fill(); cx.globalAlpha = 1;
+  });
   floaters = floaters.filter(f => f.life > 0);
-  floaters.forEach(f => { f.y -= 0.05*dt; f.life -= 0.0016*dt;
-    cx.globalAlpha = Math.max(0,Math.min(1,f.life*1.5)); cx.fillStyle = f.color;
-    cx.font = `bold ${f.size}px Microsoft YaHei`; cx.textAlign = "center";
-    cx.fillText(f.txt, f.x, f.y); cx.globalAlpha = 1; });
+  floaters.forEach(f => {
+    f.age += dt; f.y -= 0.05*dt; f.life -= 0.0016*dt;
+    const bounce = 1 + 0.55*Math.exp(-f.age/90);
+    cx.globalAlpha = Math.max(0,Math.min(1,f.life*1.5));
+    cx.fillStyle = f.color; cx.textAlign = "center";
+    cx.font = `bold ${Math.round(f.size*bounce)}px Microsoft YaHei`;
+    if (f.big){ cx.strokeStyle = "rgba(20,10,30,.9)"; cx.lineWidth = 4; cx.strokeText(f.txt, f.x, f.y); }
+    cx.fillText(f.txt, f.x, f.y); cx.globalAlpha = 1;
+  });
   cx.restore();
   requestAnimationFrame(loop);
 }
@@ -492,33 +556,45 @@ function tickQueue(dt){
     qActive = null; nextEvent();
   }
 }
-const skip = () => S.over;
 
 /* ==================== 战斗流程 ==================== */
 function startFloor(){
   hideOverlay();
-  const pool = FLOOR_PLAN(meta.floor);
-  spawnEnemy(pool[Math.floor(Math.random()*pool.length)]);
+  spawnEnemy(floorKey(meta.floor));
   S = { frame:0, turn:0, over:false, log:[],
         p:{ hp:playerMaxHp(), st:playerMaxSt(), guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0} },
         stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
   Dp.hp = S.p.hp; Dp.st = S.p.st; De.hp = E.hp; De.poise = E.poise; De.shd = E.shield;
-  V.p = { ox:0, flash:0, ghost:0, block:0, visible:1 };
+  V.p = { ox:0, oy:0, flash:0, ghost:0, block:0, visible:1 };
   V.e = { ox:0, flash:0, visible:1, aura:0, charge:0 };
+  V.dim = 0; V.fullflash = 0;
   particles = []; floaters = [];
   document.getElementById("log").innerHTML = "";
-  sysLog(`—— 第 ${meta.floor} 层 · ${E.name} 挡在回廊深处 ——`);
+  sysLog(`—— 第 ${meta.floor} 层 · ${E.name}【${E.desc}】挡在回廊深处 ——`);
+  if (E.affix) sysLog(`⚠ 精英词缀：${E.affixName}`);
+  rollIntent();
   renderUI();
 }
 function spawnEnemy(key){
   const t = ENEMIES[key], f = meta.floor;
-  const sHp = 1 + .18*(Math.min(f,5)-1) + Math.max(0,f-5)*.06;
-  const sAtk = 1 + .11*(Math.min(f,5)-1) + Math.max(0,f-5)*.05;
+  let sHp, sAtk;
+  if (f <= 10){ sHp = 1 + .105*(f-1); sAtk = 1 + .07*(f-1); }
+  else { sHp = 1.63 + .10*(f-10); sAtk = 1.45 + .06*(f-10); }
   E = { type:key, name:t.name, desc:t.desc,
     maxhp:Math.round(t.hp*sHp), atk:+(t.atk*sAtk).toFixed(1), def:t.def,
-    maxpoise:Math.round(t.poise*(1+.08*(Math.min(f,5)-1))),
+    maxpoise:Math.round(t.poise*(1+.05*(Math.min(f,10)-1))),
     phase:1, stunned:0, shield:0, maxshield:t.shield?Math.round(t.hp*sHp*t.shield):0,
-    chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0} };
+    chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0}, intent:null, guarding:false,
+    lifesteal:t.lifesteal||0, blink:t.blink||0, thorns:t.thorns||0, swift:!!t.swift, debuffOnHit:!!t.debuffOnHit,
+    affix:null, affixName:"" };
+  if (f > 10){
+    const aff = AFFIXES[Math.floor(Math.random()*AFFIXES.length)];
+    E.affix = aff.id; E.affixName = aff.name;
+    if (aff.id === "fury") E.atk = +(E.atk*1.3).toFixed(1);
+    if (aff.id === "thorn") E.thorns = Math.max(E.thorns, .25);
+    if (aff.id === "swift") E.swift = true;
+    if (aff.id === "shielded") { E.maxshield = Math.round(E.maxhp*.2); E.shield = E.maxshield; }
+  }
   E.hp = E.maxhp; E.poise = E.maxpoise;
   if (E.maxshield) E.shield = E.maxshield;
 }
@@ -529,11 +605,67 @@ const playerDmg = (mult, targetDef, crit, critMult, elem) => {
   if (elem && WEAKNESS[E.type] === elem) d *= ELEMENTS[elem].weakBonus;
   if (elem && WEAKNESS[E.type] === "any") d *= 1.2;
   if (E.debuffs.vuln > 0) d *= (1 + DEBUFFS.vuln.dmgUp);
+  if (E.guarding) d *= 0.5;
   return Math.max(1, Math.round(d));
 };
-const enemyDmg = mult => Math.max(1, Math.round(E.atk*mult*(0.9+Math.random()*0.2)));
+const enemyDmg = mult => Math.max(1, Math.round(E.atk*mult*(E.affix==="fury"?1.3:1)*(0.9+Math.random()*0.2)));
 
-/* ---- 玩家行动 ---- */
+/* ==================== 意图系统 ==================== */
+function rollIntent(){
+  if (!E || E.hp <= 0){ return; }
+  const r = Math.random();
+  const rage = E.type==="lord" ? (E.phase>=2?1.25:1) : (E.type==="heart" ? (E.phase>=4?1.35:E.phase>=3?1.15:1) : 1);
+  const it = { rage };
+  if (E.chargeNext){
+    E.intent = { type:"atk", mult:(E.type==="voidmage"?2.2:2.4)*rage, name:"末日咒术", ranged:true, charged:true };
+    E.chargeNext = false;
+  }
+  else if (E.type === "guard"){
+    E.intent = r<.5 ? { type:"atk", mult:.8*rage, name:"横扫" }
+             : r<.85 ? { type:"atk", mult:1.3*rage, name:"重劈" }
+             : { type:"atk", mult:1.0*rage, name:"突刺", follow:.7 };
+  }
+  else if (E.type === "berserker" || E.type === "bloodfang"){
+    E.intent = r<.5 ? { type:"atk", mult:1.0*rage, name:"挥砍" }
+             : r<.8 ? { type:"atk", mult:1.35*rage, name:"致命跳劈" }
+             : { type:"defend" };
+  }
+  else if (E.type === "sorcerer" || E.type === "voidmage"){
+    if (r < .26){ E.intent = { type:"charge" }; E.chargePending = true; }
+    else if (r < .48 && E.shield < E.maxshield){ E.intent = { type:"defend", reshield:.35 }; }
+    else E.intent = { type:"atk", mult:1.0*rage, name:"暗影弹", ranged:true };
+  }
+  else if (E.type === "butcher"){
+    E.intent = r<.55 ? { type:"atk", mult:1.2*rage, name:"碎铠斩", debuff:true }
+             : r<.85 ? { type:"atk", mult:1.5*rage, name:"裂地锤" }
+             : { type:"debuff", name:"破胆咆哮" };
+  }
+  else if (E.type === "lord"){
+    if (E.phase>=3 && r<.3){ E.intent = { type:"charge" }; E.chargePending = true; }
+    else if (r < .4) E.intent = { type:"atk", mult:1.0*rage, name:"王权横扫" };
+    else if (r < .7) E.intent = { type:"atk", mult:1.3*rage, name:"崩山重劈" };
+    else E.intent = { type:"atk", mult:.8*rage, name:"双连击", follow:.8 };
+  }
+  else if (E.type === "golem"){
+    if (r < .3){ E.intent = { type:"defend", regen:.04 }; }
+    else if (r < .7) E.intent = { type:"atk", mult:1.2*rage, name:"岩拳" };
+    else E.intent = { type:"atk", mult:1.6*rage, name:"崩岩坠", heavy:true };
+  }
+  else if (E.type === "shadow"){
+    E.intent = r<.6 ? { type:"atk", mult:.9*rage, name:"影袭", follow:.9 }
+             : r<.85 ? { type:"atk", mult:1.4*rage, name:"背刺" }
+             : { type:"atk", mult:.7*rage, name:"三连影刃", follow:.7, follow2:.7 };
+  }
+  else if (E.type === "heart"){
+    if (E.phase>=2 && r<.25){ E.intent = { type:"charge" }; E.chargePending = true; }
+    else if (r < .45) E.intent = { type:"drain", mult:1.1*rage, name:"汲取之爪" };
+    else if (r < .7) E.intent = { type:"atk", mult:1.3*rage, name:"回廊震怒", heavy:true };
+    else E.intent = { type:"debuff", name:"碎甲咆哮" };
+  }
+  else E.intent = { type:"atk", mult:1.0, name:"攻击" };
+}
+
+/* ==================== 玩家行动 ==================== */
 document.querySelectorAll("#actions .act").forEach(el => {
   if (el.dataset.k) el.addEventListener("click", () => playerAct(el.dataset.k));
 });
@@ -541,33 +673,15 @@ function lockUI(){ document.querySelectorAll("#actions .act").forEach(el => el.c
 function unlockUI(){ document.querySelectorAll("#actions .act").forEach(el => el.classList.remove("lock")); }
 
 function switchStance(){
-  if (inputLocked || S.over) return;
+  if (inputLocked || !S || S.over) return;
   const order = ["neutral", "aggro", "def"];
-  const i = order.indexOf(meta.stance);
-  meta.stance = order[(i+1)%3];
+  meta.stance = order[(order.indexOf(meta.stance)+1)%3];
   sysLog(`切换站位：${STANCES[meta.stance].name}（命中${STANCES[meta.stance].hit>0?"+":""}${Math.round(STANCES[meta.stance].hit*100)}%，受伤×${STANCES[meta.stance].taken}）`);
   saveGame(); renderUI();
 }
 function playerAct(kind){
   if (!S || S.over || inputLocked) return;
   const p = S.p;
-  if (kind === "finisher"){
-    if (meta.combo < 3){ sysLog("连击不足（需 3 层）"); return; }
-    meta.combo = 0;
-    const d = Math.round(playerAtk() * 4.0 * 1.5); // 4× 必暴击
-    runSeq([
-      { dur:400, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-60)*t; V.shake = 6; } },
-      { dur:200, start:()=>{
-          S.stats.dmg += d; E.hp = Math.max(0, E.hp-d);
-          burst(E_BASE.x-20, E_BASE.y-70, 40, "#ffd76e", 4, 2);
-          floatText(E_BASE.x-10, E_BASE.y-160, `${d}!!`, "#ffd76e", 36);
-          V.shake = 18;
-          addLog(`<span class="crit">终结技</span> → ${d} 伤害（4× 必暴击）`);
-        } },
-      { dur:300, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-60)*(1-t); } },
-    ], () => afterPlayerAttack(true));
-    return;
-  }
   if (kind === "riposte" && E.poise > 0) return;
   if (kind === "potion" && meta.potions <= 0) return;
   lockUI();
@@ -598,26 +712,49 @@ function playerAct(kind){
     p.hp = Math.min(playerMaxHp(), p.hp+heal);
     addLog(`${h}玩家使用药剂 <span class="heal">+${heal} HP</span>（剩 ${meta.potions}）`);
     runSeq([{ dur:420, start:()=>{ burst(P_BASE.x, P_BASE.y-70, 14, "#7fd8a0", 1.6, 1.4);
-               floatText(P_BASE.x, P_BASE.y-130, `+${heal}`, "#7fd8a0", 20); } }], () => enemyPhase());
+               floatText(P_BASE.x, P_BASE.y-130, `+${heal}`, "#7fd8a0", 20);
+               ringFx(P_BASE.x, P_BASE.y-60, "rgba(127,216,160,.6)"); } }], () => enemyPhase());
     return;
   }
   if (kind === "riposte"){
     const mult = hasRelic("hunter")?4.0:3.0;
-    const d = Math.round(playerAtk()*mult*1.5); // 暗属性，不触发弱点（处决已无视防御）
+    const d = Math.round(playerAtk()*mult*1.5);
     runSeq([
-      { dur:300, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-70)*t; } },
+      { dur:300, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-70)*t; V.dim = t; } },
       { dur:160, start:()=>{
           S.frame += 4; S.stats.execs++;
-          applyToEnemy(d, true, "处决", true);
-          burst(E_BASE.x-20, E_BASE.y-70, 26, "#c792ea", 3.2, 1.2);
-          floatText(E_BASE.x-10, E_BASE.y-150, `${d}!`, "#c792ea", 30);
-          V.shake = 14; V.slash = { show:1, x:E_BASE.x-30, y:E_BASE.y-70, flip:1 };
-        }, update:t=>{ V.slash.show = 1-t; } },
-      { dur:300, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-70)*(1-t); V.slash.show = 0; } },
+          E.hp = Math.max(0, E.hp - d); S.stats.dmg += d;
+          floatText(E_BASE.x-10, E_BASE.y-160, `${d}!`, "#c792ea", 34, { big:true });
+          floatText(E_BASE.x-10, E_BASE.y-195, "处决", "#e8d5ff", 15, { big:true });
+          burst(E_BASE.x-20, E_BASE.y-70, 30, "#c792ea", 3.4, 1.2);
+          burst(E_BASE.x-20, E_BASE.y-70, 14, "#ffd76e", 2.4, 1.6);
+          V.shake = 15; V.slash = { show:1, x:E_BASE.x-30, y:E_BASE.y-70, flip:1, cross:1 };
+        }, update:t=>{ V.slash.show = 1-t; V.slash.cross = 1-t; } },
+      { dur:340, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-70)*(1-t); V.dim = 1-t; V.slash.show = 0; V.slash.cross = 0; } },
     ], () => afterPlayerAttack(true));
     return;
   }
-  // 攻击
+  if (kind === "finisher"){
+    if (meta.combo < 3){ sysLog("连击不足（需 3 层）"); S.turn--; renderUI(); return; }
+    meta.combo = 0;
+    const d = Math.round(playerAtk()*4.0*1.5);
+    runSeq([
+      { dur:400, start:()=>{ V.fullflash = .5; }, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-60)*t; V.shake = 6; } },
+      { dur:200, start:()=>{
+          S.stats.dmg += d; E.hp = Math.max(0, E.hp-d);
+          floatText(E_BASE.x-10, E_BASE.y-165, `${d}!!`, "#ffd76e", 38, { big:true });
+          floatText(E_BASE.x-10, E_BASE.y-205, "终 结 技", "#fff2cc", 16, { big:true });
+          burst(E_BASE.x-20, E_BASE.y-70, 42, "#ffd76e", 4, 2);
+          ringFx(E_BASE.x-20, E_BASE.y-70, "rgba(255,215,110,.9)");
+          ringFx(E_BASE.x-20, E_BASE.y-70, "rgba(255,255,255,.7)");
+          V.shake = 18;
+          addLog(`<span class="crit">终结技</span> → ${d} 伤害（4× 必暴击）`);
+        } },
+      { dur:300, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-60)*(1-t); } },
+    ], () => afterPlayerAttack(true));
+    return;
+  }
+  // 攻击（轻击=火 双段斩 / 重击=雷 跳劈）
   const mv = kind === "light"
     ? { name:"轻击", cost:25, startup:2, recovery:1, mult:1.0, poiseDmg:hasRelic("hammer")?15:10, critBase:.15, elem:"fire" }
     : { name:"重击", cost:40, startup:4, recovery:3, mult:1.8, poiseDmg:hasRelic("hammer")?38:25, critBase:.15, elem:"thunder" };
@@ -633,121 +770,194 @@ function playerAct(kind){
     const abs = Math.min(E.shield, Math.round(d*0.5));
     shTxt = `（护盾吸收 ${abs}）`; d = d - Math.round(d*0.5);
   }
-  if (E.chargeNext){ d = Math.round(d*1.5); shTxt += " 蓄力目标受伤+50%"; }
+  if (E.debuffs.vuln > 0) shTxt += " 易伤+30%";
   S.stats.swings++; S.stats.hits++;
   if (crit) S.stats.crits++;
   meta.combo++;
   if (meta.combo >= 3) sysLog("⚡ 连击满 3 层，终结技解锁！");
-  const reach = kind==="light" ? 90 : 120;
-  runSeq([
-    { dur:120+mv.startup*70, update:t=>{ V.p.ox = reach*t*t; } },
-    { dur:150, start:()=>{
-        S.frame += mv.recovery;
-        applyToEnemy(d, crit, mv.name, false);
-        E.shield = Math.max(0, E.shield - Math.min(E.shield, d0-d));
-        if (E.maxshield && E.shield===0){ E.poise = Math.max(0,E.poise-20); sysLog("护盾碎裂！削韧 +20"); }
-        E.poise = Math.max(0, E.poise - mv.poiseDmg);
-        S.stats.dmg += d;
-        p.dodgeBuff = false;
-        if (hasRelic("leech") && d>0){ const hl = Math.min(8, Math.round(d*.12));
-          p.hp = Math.min(playerMaxHp(), p.hp+hl);
-          addLog(`吸血剑 <span class="heal">+${hl} HP</span>`); }
-        // 元素Debuff
-        if (mv.elem === "fire" && E.debuffs.burn < DEBUFFS.burn.max){ E.debuffs.burn++; sysLog(`灼烧叠加（${E.debuffs.burn}层）`); }
-        if (mv.elem === "thunder" && E.debuffs.breakd < DEBUFFS.breakd.max){ E.debuffs.breakd++; sysLog(`破防叠加（${E.debuffs.breakd}层）`); }
-        if (mv.elem === "dark" && E.debuffs.vuln < DEBUFFS.vuln.max){ E.debuffs.vuln++; sysLog(`易伤叠加（${E.debuffs.vuln}层）`); }
-        if (E.poise === 0){ sysLog("⚠ 敌人韧性破！倒地 1 回合，出现处决窗口"); E.stunned = 1; }
-        V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-70, flip:1 };
-        V.e.flash = 1; V.shake = kind==="heavy"?9:5;
-        burst(E_BASE.x+V.e.ox-30, E_BASE.y-70, crit?18:10, crit?"#ffd76e":"#ff8a8a", 2.2, 0.8);
-        floatText(E_BASE.x+V.e.ox-20, E_BASE.y-150, `${d}`, crit?"#ffd76e":"#ff8a8a", crit?27:21);
-        let elemTxt = "";
-        if (mv.elem && WEAKNESS[E.type] === mv.elem) elemTxt = ` <span style="color:${ELEMENTS[mv.elem].color}">⚡弱点克制！</span>`;
-        addLog(`${h}玩家 <b>${mv.name}</b>（${ELEMENTS[mv.elem].name}）→ ${crit?`<span class="crit">暴击 ${d}</span>`:`<span class="dmg">${d}</span>`} · 削韧 ${mv.poiseDmg}${shTxt}${elemTxt}`);
-      }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); } },
-    { dur:140+mv.recovery*60, update:t=>{ V.p.ox = reach*(1-t); } },
-  ], () => afterPlayerAttack(false));
+  // 闪现规避
+  if (E.blink > 0 && Math.random() < E.blink){
+    S.stats.dmg += 0; p.dodgeBuff = false;
+    addLog(`${h}玩家 <b>${mv.name}</b> → <span class="sys">${E.name} 闪现规避！</span>`);
+    runSeq([
+      { dur:140, update:t=>{ V.p.ox = 60*t; } },
+      { dur:200, start:()=>{ burst(E_BASE.x, E_BASE.y-70, 14, "#6a9cff", 2, 0.5); floatText(E_BASE.x-10, E_BASE.y-150, "MISS", "#8a93ad", 20); V.e.ghost = 1; },
+        update:t=>{ V.e.ox = -70*Math.sin(t*Math.PI); } },
+      { dur:140, update:t=>{ V.p.ox = 60*(1-t); } },
+    ], () => afterPlayerAttack(false));
+    return;
+  }
+  const elemTxt = mv.elem && WEAKNESS[E.type] === mv.elem ? ` <span style="color:${ELEMENTS[mv.elem].color}">⚡弱点克制！</span>` : "";
+  if (kind === "light"){
+    // 双段斩
+    runSeq([
+      { dur:160, update:t=>{ V.p.ox = 92*t*t; } },
+      { dur:130, start:()=>{
+          S.frame += 1;
+          hitEnemy(d, crit, mv, shTxt, elemTxt, 1);
+          V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-70, flip:1, cross:0 };
+          V.e.flash = 1; V.shake = 5;
+        }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); } },
+      { dur:120, start:()=>{
+          const d2 = Math.max(1, Math.round(d*0.35));
+          E.hp = Math.max(0, E.hp - d2); S.stats.dmg += d2;
+          floatText(E_BASE.x+V.e.ox-8, E_BASE.y-130, `${d2}`, "#ffb0a0", 16);
+          burst(E_BASE.x+V.e.ox-26, E_BASE.y-64, 6, "#ff7a4a", 1.6, 0.6);
+          V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-84, flip:-1, cross:0 };
+        }, update:t=>{ V.slash.show = 1-t; } },
+      { dur:150, update:t=>{ V.p.ox = 92*(1-t); } },
+    ], () => afterPlayerAttack(false));
+  } else {
+    // 跳劈
+    const reach = 120;
+    runSeq([
+      { dur:260, update:t=>{ V.p.ox = reach*0.4*t; V.p.oy = 70*Math.sin(t*Math.PI*0.5); } },
+      { dur:150, start:()=>{
+          S.frame += mv.recovery;
+          hitEnemy(d, crit, mv, shTxt, elemTxt, 1);
+          V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-70, flip:1, cross:0 };
+          V.e.flash = 1; V.shake = 10;
+          ringFx(E_BASE.x+V.e.ox-30, E_BASE.y-10, "rgba(255,215,110,.8)");
+          burst(E_BASE.x+V.e.ox-30, E_BASE.y-70, crit?18:12, crit?"#ffd76e":"#ffd76e", 2.4, 0.8);
+        }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); V.p.oy = 70*(1-t*0.5); } },
+      { dur:200, update:t=>{ V.p.ox = reach*0.4*(1-t); V.p.oy = 35*(1-t); } },
+    ], () => afterPlayerAttack(false));
+  }
 }
-function afterPlayerAttack(riposted){
-  if (S.over){ return; }
+function hitEnemy(d, crit, mv, shTxt, elemTxt, poiseMul){
+  const p = S.p;
+  E.hp = Math.max(0, E.hp - d);
+  E.shield = Math.max(0, E.shield - Math.min(E.shield, Math.round(d*0) + (E.shield>0?0:0)));
+  if (E.maxshield && E.shield===0){ E.poise = Math.max(0,E.poise-20); sysLog("护盾碎裂！削韧 +20"); }
+  const pd = Math.round(mv.poiseDmg * (E.guarding?0.5:1) * poiseMul);
+  E.poise = Math.max(0, E.poise - pd);
+  S.stats.dmg += d;
+  p.dodgeBuff = false;
+  if (hasRelic("leech") && d>0){ const hl = Math.min(8, Math.round(d*.12));
+    p.hp = Math.min(playerMaxHp(), p.hp+hl); }
+  if (mv.elem === "fire" && E.debuffs.burn < DEBUFFS.burn.max){ E.debuffs.burn++; sysLog(`灼烧叠加（${E.debuffs.burn}层）`); }
+  if (mv.elem === "thunder" && E.debuffs.breakd < DEBUFFS.breakd.max){ E.debuffs.breakd++; sysLog(`破防叠加（${E.debuffs.breakd}层）`); }
+  if (E.poise === 0){ sysLog("⚠ 敌人韧性破！倒地 1 回合，出现处决窗口"); E.stunned = 1; }
+  const tag = crit ? "crit" : "dmg";
+  floatText(E_BASE.x+V.e.ox-20, E_BASE.y-150, `${d}`, crit?"#ffd76e":"#ff8a8a", crit?28:21, { big:crit });
+  if (crit) burst(E_BASE.x+V.e.ox-24, E_BASE.y-90, 8, "#ffd76e", 1.4, 1.6);
+  if (elemTxt) floatText(E_BASE.x+V.e.ox+28, E_BASE.y-128, "克制!", ELEMENTS[mv.elem].color, 14, { big:true });
+  addLog(`<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> 玩家 <b>${mv.name}</b>（${ELEMENTS[mv.elem].name}）→ ${crit?`<span class="crit">暴击 ${d}</span>`:`<span class="dmg">${d}</span>`} · 削韧 ${pd}${shTxt}${elemTxt}`);
+  // 磐岩/荆棘反伤
+  if (E.thorns > 0 && d > 0){
+    const ref = Math.round(d * E.thorns * (meta.stance==="def"?0.8:1));
+    if (ref > 0){
+      p.hp = Math.max(0, p.hp - ref);
+      floatText(P_BASE.x, P_BASE.y-140, `${ref}`, "#7fd8a0", 17);
+      burst(P_BASE.x, P_BASE.y-70, 8, "#7fd8a0", 1.8, 0.6);
+      addLog(`${E.affixName||E.name} 的反伤甲 → 玩家 <span class="dmg">${ref}</span> 反弹伤害`);
+    }
+  }
+}
+function afterPlayerAttack(){
+  if (S.over) return;
   if (E.hp <= 0){ killEnemy(); return; }
   enemyPhase();
 }
-function applyToEnemy(d, crit, label, ignoreDef){
-  E.hp = Math.max(0, E.hp - d);
-  S.stats.dmg += d;
-}
-
-/* ---- 敌人回合（AI 决策 + 动画顺序执行） ---- */
+/* ---- 敌人回合：执行预告的 intent ---- */
 function enemyPhase(){
   if (S.over) return;
   const evs = [];
   if (E.stunned > 0){
     E.stunned--; sysLog("敌人倒地中，跳过行动");
+    E.guarding = false;
     runSeq([{ dur:300, update:()=>{} }], () => endRound());
     return;
   }
   S.frame += 3;
-  // 阶段切换检测
   const phaseTo = (to, msg) => { if (E.phase < to){ E.phase = to; evs.push({ phaseMsg:msg }); } };
-  if (E.type === "guard")     phaseTo(2, "⚠ 回廊守卫进入狂暴：伤害 ×1.3，解锁连击");
+  if (E.type === "guard")     phaseTo(2, "⚠ 回廊守卫进入狂暴：伤害 ×1.3");
   if (E.type === "berserker") if (E.phase===1 && E.hp <= E.maxhp*.4) phaseTo(2, "⚠ 血狂战士进入嗜血：每回合双动！");
   if (E.type === "lord"){
     if (E.phase===1 && E.hp <= E.maxhp*.7) phaseTo(2, "⚠ 回廊之主 · 第二阶段：狂暴 ×1.25");
-    if (E.phase===2 && E.hp <= E.maxhp*.35) phaseTo(3, "⚠ 回廊之主 · 最终阶段：末日循环");
+    if (E.phase===2 && E.hp <= E.maxhp*.35) phaseTo(3, "⚠ 回廊之主 · 第三阶段：解锁末日蓄力");
   }
-  const rage = E.type==="lord" ? (E.phase>=2?1.25:1) : (E.type==="guard"&&E.phase===2 ? 1.3 : 1);
+  if (E.type === "heart"){
+    if (E.phase===1 && E.hp <= E.maxhp*.75) phaseTo(2, "⚠ 回廊之心 · 心律加速：解锁末日蓄力");
+    if (E.phase===2 && E.hp <= E.maxhp*.5) phaseTo(3, "⚠ 回廊之心 · 心悸：吸血强化");
+    if (E.phase===3 && E.hp <= E.maxhp*.25) phaseTo(4, "⚠ 回廊之心 · 最终阶段：狂暴 ×1.35！");
+  }
+  const it = E.intent || { type:"atk", mult:1, name:"攻击" };
   const tag = () => `<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> `;
 
-  const atk = (mult, name, ranged) => {
-    evs.push({ atk:true, mult:mult*rage, name, ranged });
-  };
-  const r = Math.random();
-  if (E.type === "guard"){
-    if (r < .5) atk(.8, "横扫");
-    else if (r < .85) atk(1.3, "重劈");
-    else { atk(1.0, "突刺"); if (E.phase===2) atk(.7, "连击·第二段"); }
-  } else if (E.type === "berserker"){
-    atk(r < .5 ? 1.0 : 1.35, r < .5 ? "挥砍" : "致命跳劈");
-    if (E.phase === 2) atk(.8, "嗜血追击");
-  } else if (E.type === "sorcerer"){
-    if (E.chargeNext){ evs.push({ proj:true, mult:2.2, name:"末日咒术" }); E.chargeNext = false;
-      if (E.maxshield && E.shield===0) evs.push({ reshield:.5 }); }
-    else if (r < .28){ E.chargeNext = true; evs.push({ charge:true, msg:"开始<b>蓄力</b>（受伤 +50%，下回合末日 2.2×）" }); }
-    else if (r < .5 && E.shield < E.maxshield){ evs.push({ reshield:.35 }); }
-    else atk(1.0, "暗影弹", true);
-  } else { // lord
-    if (E.phase===3 && S.turn % 3 === 0 && !E.chargeNext){ E.chargeNext = true;
-      evs.push({ charge:true, msg:"聚集回廊之力（受伤 +50%，下回合末日 2.4×）" }); }
-    else if (E.chargeNext){ evs.push({ proj:true, mult:2.4, name:"回廊末日" }); E.chargeNext = false; }
-    else if (r < .4) atk(1.0, "王权横扫");
-    else if (r < .7) atk(1.3, "崩山重劈");
-    else { atk(.8, "双连击"); atk(.8, "双连击·二段"); }
+  if (it.type === "phaseMsg" || it.phaseMsg !== undefined){ /* handled below */ }
+  if (it.type === "charge"){
+    E.chargeNext = true;
+    evs.push({ charge:true, msg:"开始<b>蓄力</b>（受伤 +50%，下回合末日咒术）" });
   }
+  else if (it.type === "defend"){
+    E.guarding = true;
+    if (it.reshield) evs.push({ reshield:it.reshield, msg:"进入防御，重塑护盾" });
+    else if (it.regen) evs.push({ regen:it.regen, msg:"石化愈合，回复生命" });
+    else evs.push({ defendMsg:"举盾防御（本回合受伤 -50%，削韧减半）" });
+  }
+  else if (it.type === "debuff"){
+    evs.push({ debuff:it.name });
+  }
+  else { // atk / drain
+    evs.push({ atk:true, mult:it.mult, name:it.name, ranged:!!it.ranged, heavy:!!it.heavy, follow:it.follow, follow2:it.follow2, drain:it.type==="drain" });
+  }
+  if (E.type === "berserker" && E.phase === 2 && it.type === "atk")
+    evs.push({ atk:true, mult:.8, name:"嗜血追击" });
+  if (E.swift && it.type === "atk" && Math.random() < .35)
+    evs.push({ atk:true, mult:.7, name:"迅捷追击" });
+  if (E.affix === "swift" && it.type === "atk" && Math.random() < .35)
+    evs.push({ atk:true, mult:.7, name:"迅捷追击" });
+  if (E.affix === "regen") evs.push({ regen:.03 });
+
   runSeq(evs.map(e => {
     if (e.phaseMsg !== undefined) return { dur:600, start:()=>{
         sysLog(e.phaseMsg); V.e.aura = 1; V.shake = 8;
         burst(E_BASE.x, E_BASE.y-80, 24, "#ff6a6a", 2.8, 1.5);
-        floatText(E_BASE.x, E_BASE.y-170, "PHASE UP", "#ff9c9c", 24);
+        floatText(E_BASE.x, E_BASE.y-170, "PHASE UP", "#ff9c9c", 24, { big:true });
       }, update:t=>{ V.e.aura = 0.6+0.4*Math.sin(t*Math.PI); } };
     if (e.charge) return { dur:520, start:()=>{ addLog(`${tag()}<b>${E.name}</b> ${e.msg}`); V.e.charge = 0.1; }, update:t=>{ V.e.charge = 0.1+0.9*t; } };
     if (e.reshield) return { dur:420, start:()=>{
         const add = Math.round(E.maxshield*e.reshield);
         E.shield = Math.min(E.maxshield, E.shield+add);
-        addLog(`${tag()}<b>咒术师</b> 重塑护盾 <span class="heal">+${add}</span>`);
+        addLog(`${tag()}<b>${E.name}</b> ${e.msg} <span class="heal">+${add}</span>`);
         burst(E_BASE.x, E_BASE.y-70, 12, "#b3a1e8", 1.8, 1);
+      } };
+    if (e.regen) return { dur:380, start:()=>{
+        const add = Math.round(E.maxhp*e.regen);
+        E.hp = Math.min(E.maxhp, E.hp+add);
+        addLog(`${tag()}<b>${E.name}</b> 再生 <span class="heal">+${add}</span>`);
+        floatText(E_BASE.x, E_BASE.y-150, `+${add}`, "#7fd8a0", 16);
+      } };
+    if (e.defendMsg) return { dur:420, start:()=>{
+        addLog(`${tag()}<b>${E.name}</b> ${e.defendMsg}`);
+        ringFx(E_BASE.x, E_BASE.y-60, "rgba(150,160,200,.7)");
+      } };
+    if (e.debuff) return { dur:480, start:()=>{
+        const p = S.p;
+        if (p.debuffs.vuln < DEBUFFS.vuln.max) p.debuffs.vuln++;
+        addLog(`${tag()}<b>${E.name}</b> 使用 <b>${e.debuff}</b> → 玩家获得 <span class="dmg">易伤</span>（受伤 +30%）`);
+        burst(P_BASE.x, P_BASE.y-70, 12, "#c792ea", 2, 1);
+        floatText(P_BASE.x, P_BASE.y-140, "易伤!", "#c792ea", 16, { big:true });
       } };
     if (e.proj) return { dur:640, start:()=>{ V.proj = { show:1, x:E_BASE.x, y:E_BASE.y-90, r:10 }; },
         update:t=>{ V.proj.x = E_BASE.x + (P_BASE.x-E_BASE.x)*t; V.proj.y = E_BASE.y-90 + Math.sin(t*Math.PI)*30; },
-        end:()=>{ V.proj.show = 0; V.e.charge = 0; enemyHit(e.mult, e.name, true); } };
-    return { dur:520, start:()=>{ V.e.ox = 0; }, update:t=>{
-        if (t < .45) V.e.ox = -(E_BASE.x-P_BASE.x-80)*(t/.45);
-        else if (t < .62){ if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, false); } V.e.ox = -(E_BASE.x-P_BASE.x-80); }
-        else V.e.ox = -(E_BASE.x-P_BASE.x-80)*(1-(t-.62)/.38);
+        end:()=>{ V.proj.show = 0; V.e.charge = 0; enemyHit(e.mult, e.name, true, e.drain); } };
+    return { dur:e.heavy?640:520, start:()=>{ V.e.ox = 0; }, update:t=>{
+        const dist = (E_BASE.x-P_BASE.x-80);
+        if (e.heavy){
+          if (t < .5){ V.e.ox = -dist*Math.sin(t*Math.PI*0.5)*0.4; }
+          else if (t < .62){ if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, false, e.drain); ringFx(P_BASE.x, P_BASE.y-10, "rgba(255,120,90,.8)"); } V.e.ox = -dist*0.4; }
+          else V.e.ox = -dist*0.4*(1-(t-.62)/.38);
+        } else {
+          if (t < .45) V.e.ox = -dist*(t/.45);
+          else if (t < .62){ if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, false, e.drain); } V.e.ox = -dist; }
+          else V.e.ox = -dist*(1-(t-.62)/.38);
+        }
       } };
   }), () => endRound());
 }
-function enemyHit(mult, name, ranged){
+function enemyHit(mult, name, ranged, drain){
   if (S.over) return;
   const p = S.p;
   const base = enemyDmg(mult);
@@ -757,7 +967,7 @@ function enemyHit(mult, name, ranged){
   if (p.dodgeBuff){ final = 0; note = `<span class="heal">被闪避！</span>`;
     floatText(P_BASE.x, P_BASE.y-140, "MISS", "#7fd8a0", 20); }
   else if (p.guard){
-    final = Math.round(base*.3); note = "格挡减伤 70%"; V.p.block = 1;
+    final = Math.round(base*.3*STANCES[meta.stance].taken); note = "格挡减伤 70%"; V.p.block = 1;
     if (hasRelic("thorn")){
       const ref = Math.round(base*.3);
       E.hp = Math.max(0, E.hp-ref);
@@ -771,27 +981,30 @@ function enemyHit(mult, name, ranged){
     p.hp = Math.max(0, p.hp-final);
     V.shake = ranged?8:10;
     burst(P_BASE.x, P_BASE.y-70, 12, "#ff8a8a", 2.2, 0.8);
-    floatText(P_BASE.x, P_BASE.y-150, `${final}`, "#ff8a8a", 22);
+    floatText(P_BASE.x, P_BASE.y-150, `${final}`, "#ff8a8a", 22, { big:final>base*1.1 });
+    if (E.lifesteal > 0 || drain){
+      const ls = Math.round(final*(drain?0.5:E.lifesteal));
+      if (ls > 0){ E.hp = Math.min(E.maxhp, E.hp+ls);
+        floatText(E_BASE.x+V.e.ox, E_BASE.y-160, `+${ls}`, "#7fd8a0", 15);
+        addLog(`${E.name} 汲取生命 <span class="heal">+${ls}</span>`); }
+    }
+    if (E.debuffOnHit){
+      if (p.debuffs.vuln < DEBUFFS.vuln.max) p.debuffs.vuln++;
+      note += " · <span class='dmg'>碎甲</span>（易伤+1）";
+    }
   }
   p.dodgeBuff = false;
   if (final > 0 && meta.combo > 0){ meta.combo = 0; sysLog("连击被打断！"); }
   addLog(`<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> <b>${E.name}</b> <b>${name}</b> → ${final>0?`<span class="dmg">${final}</span> 伤害`:`<span class="heal">0 伤害</span>`} ${note}`);
   flushLog(); renderUI();
 }
-function applyDebuffs(){
-  const p = S.p;
-  // 玩家Debuff
-  if (p.debuffs.burn > 0){ p.hp = Math.max(0, p.hp - DEBUFFS.burn.dot); sysLog(`灼烧伤害 -${DEBUFFS.burn.dot} HP`); }
-  // 敌人Debuff
-  if (E.debuffs.burn > 0){ E.hp = Math.max(0, E.hp - DEBUFFS.burn.dot); sysLog(`敌方灼烧 -${DEBUFFS.burn.dot} HP`); }
-  // 检查死亡
-  if (E.hp <= 0){ killEnemy(); return true; }
-  if (p.hp <= 0){ playerDie(); return true; }
-  return false;
-}
 function endRound(){
-  if (applyDebuffs()) return;
   if (S.over) return;
+  // 回合末结算：灼烧 / 再生 / 防御重置
+  if (S.p.debuffs.burn > 0){ S.p.hp = Math.max(0, S.p.hp - DEBUFFS.burn.dot); sysLog(`灼烧伤害 -${DEBUFFS.burn.dot} HP`); }
+  if (E.debuffs.burn > 0){ E.hp = Math.max(0, E.hp - DEBUFFS.burn.dot); sysLog(`敌方灼烧 -${DEBUFFS.burn.dot} HP`); }
+  E.guarding = false;
+  rollIntent();
   if (E.hp <= 0){ killEnemy(); return; }
   if (S.p.hp <= 0){ playerDie(); return; }
   renderUI();
@@ -804,33 +1017,46 @@ function killEnemy(){
   saveGame();
   sysLog(`${E.name} 被击败！获得回廊之魂 +${gain}`);
   flushLog();
-  runSeq([{ dur:650, start:()=>{ burst(E_BASE.x, E_BASE.y-70, 40, "#c792ea", 3.4, 1.6); V.shake = 12; },
-            update:t=>{ V.e.visible = 1-t; V.e.aura = 1-t; } }], () => showVictory(gain));
+  runSeq([
+    { dur:700, start:()=>{
+        burst(E_BASE.x, E_BASE.y-70, 44, "#c792ea", 3.4, 1.6);
+        burst(E_BASE.x, E_BASE.y-70, 20, "#ffd76e", 2.6, 2);
+        rain(26, "#ffd76e"); rain(14, "#e8d5ff");
+        ringFx(E_BASE.x, E_BASE.y-70, "rgba(199,146,234,.9)");
+        V.shake = 12; V.fullflash = .3;
+      }, update:t=>{ V.e.visible = 1-t; V.e.aura = 1-t; } },
+  ], () => showVictory(gain));
 }
 function playerDie(){
   S.over = true;
   sysLog("玩家倒下……回廊记得每一次倒下");
   flushLog();
-  runSeq([{ dur:650, start:()=>{ burst(P_BASE.x, P_BASE.y-70, 30, "#ff8a8a", 3, 1.2); V.shake = 10; },
-            update:t=>{ V.p.visible = 1-t; } }], () => showDeath());
+  runSeq([
+    { dur:800, start:()=>{ burst(P_BASE.x, P_BASE.y-70, 30, "#ff8a8a", 3, 1.2); V.shake = 10; V.dim = .8; },
+      update:t=>{ V.p.visible = 1-t; } },
+  ], () => showDeath());
 }
 
 /* ==================== 覆盖层 ==================== */
 const overlay = document.getElementById("overlay"), ovPanel = document.getElementById("ov-panel");
-function showOverlay(html){ ovPanel.innerHTML = html; overlay.classList.add("show"); }
-function hideOverlay(){ overlay.classList.remove("show"); }
+function showOverlay(html, cls){
+  ovPanel.className = "ov-panel" + (cls ? " " + cls : "");
+  ovPanel.innerHTML = html; overlay.classList.add("show");
+}
+function hideOverlay(){ overlay.classList.remove("show"); ovPanel.className = "ov-panel"; }
 
 function showMenu(){
   const saved = loadGame();
   showOverlay(`
     <h3>试炼回廊</h3>
-    <div class="sub">深入五层回廊，击败回廊之主，夺回回廊之心——此后回廊无尽。<br>死亡不会清空成长：魂与遗物永久保留，从倒下的那层继续。</div>
+    <div class="sub">深入十层回廊，每层守关者各有独门杀技：碎铠、吸血、闪现、反伤、迅捷……<br>击败第十层的「回廊之心」，回廊将无限延伸——且越来越深、越来越险。<br>死亡不会清空成长：魂与遗物永久保留，从倒下的那层继续。</div>
     <div class="help">
-      · 回合制：你先手。轻击快、重击狠，行动消耗体力，每回合自然回复<br>
-      · 削韧：打空韧性槽出现<span style="color:#c792ea">处决</span>（3× 无视防御，倒地 1 回合）<br>
-      · 博弈：咒术师蓄力时打它伤害 +50%；格挡减伤 70%，闪避后轻击必暴击<br>
-      · 每层通关：回廊之魂 + 遗物三选一；魂可加点攻击/生命/体力/药剂<br>
-      · 所有角色与特效由 Canvas 程序化绘制，零图片资源
+      · <b style="color:#ffd76e">意图预告</b>：敌人头顶会预告下回合行动——攻击/蓄力/防御/特殊，据此决策<br>
+      · 敌人防御回合：受伤 -50%、削韧减半——适合用药剂、叠加异常或攒连击<br>
+      · 回合制：你先手。轻击=火（双段斩），重击=雷（跳劈），处决系=暗<br>
+      · 削韧：打空韧性槽敌人倒地 1 回合，可处决（3× 无视防御）<br>
+      · 站位：前压命中+15% 受伤+20% / 后撤命中-10% 受伤-20%<br>
+      · 每层通关：回廊之魂 + 遗物三选一；魂可加点攻击/生命/体力/药剂
     </div>
     <button class="ovbtn" onclick="newRun()">开始新的远征</button>
     ${saved && saved.floor ? `<button class="ovbtn gray" onclick="continueRun()">继续远征（第 ${saved.floor} 层）</button>` : ""}
@@ -849,14 +1075,15 @@ function showVictory(gain){
   const picks = [];
   while (picks.length < 3 && pool.length) picks.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
   window._picks = picks;
+  const endless = meta.floor >= 10;
   showOverlay(`
-    <h3>第 ${meta.floor} 层 · 通关</h3>
-    <div class="sub">获得回廊之魂 <span class="soul">+${gain}</span>（当前 <span class="soul">${meta.souls}</span>）</div>
+    <h3 class="win">${endless?"回廊之心 已被击败！":"第 "+meta.floor+" 层 · 通关"}</h3>
+    <div class="sub">${endless?"回廊开始无限延伸——精英词缀将越来越常见":"获得回廊之魂 <span class='soul'>+"+gain+"</span>（当前 <span class='soul'>"+meta.souls+"</span>）"}</div>
     <div class="choices">
       ${picks.map((r,i)=>`<div class="choice" onclick="pickRelic(${i})"><div class="cn">${r.name}</div><div class="cd">${r.desc}</div></div>`).join("")}
     </div>
     <button class="ovbtn gray" onclick="pickRelic(-1)">放弃遗物（+5 魂）</button>
-  `);
+  `, "victory");
 }
 function pickRelic(i){
   if (i >= 0){ meta.relics.push(window._picks[i].id); sysLog(`获得遗物「${window._picks[i].name}」`); }
@@ -867,7 +1094,7 @@ const upCost = k => UP_INFO[k].base + (meta.up[k]||0)*UP_INFO[k].step;
 function showLevelUp(){
   showOverlay(`
     <h3>整备 · 前往第 ${meta.floor} 层</h3>
-    <div class="sub">用回廊之魂强化自己（当前 <span class="soul">${meta.souls}</span> 魂）</div>
+    <div class="sub">${meta.floor>10?"无尽回廊 · 敌人持续变强（当前 <span class='soul'>"+meta.souls+"</span> 魂）":"用回廊之魂强化自己（当前 <span class='soul'>"+meta.souls+"</span> 魂）"}</div>
     <div class="upgrid">
       ${Object.keys(UP_INFO).map(k=>{
         const u = UP_INFO[k], cost = upCost(k), maxed = u.max && meta.up[k] >= u.max;
@@ -890,11 +1117,11 @@ function buyUpgrade(k){
 }
 function showDeath(){
   showOverlay(`
-    <h3 style="color:#ff8a8a">远征止步</h3>
+    <h3 class="lose">远征止步</h3>
     <div class="sub">你倒在了第 ${meta.floor} 层的 ${E.name} 面前。<br>魂与遗物不会消失——重整旗鼓，从这一层继续。</div>
     <button class="ovbtn" onclick="retryFloor()">重整旗鼓（重战本层）</button>
     <button class="ovbtn gray" onclick="showMenu()">返回大厅</button>
-  `);
+  `, "defeat");
 }
 function retryFloor(){ saveGame(); startFloor(); }
 
@@ -910,7 +1137,7 @@ function renderUI(){
   if (!meta || !S) return;
   document.getElementById("ui-floor").textContent = meta.floor;
   document.getElementById("ui-souls").textContent = meta.souls;
-  document.getElementById("ui-enemy-tag").textContent = E ? E.name : "-";
+  document.getElementById("ui-enemy-tag").textContent = E ? E.name + (E.affixName?`【${E.affixName}】`:"") : "-";
   document.getElementById("btn-riposte").style.display = E && E.poise===0 && !S.over ? "block" : "none";
   document.getElementById("pot-cost").textContent = `剩 ${meta.potions}`;
   document.getElementById("s-turn").textContent = S.turn;
@@ -920,11 +1147,15 @@ function renderUI(){
   document.getElementById("s-hit").textContent = S.stats.swings>0 ? Math.round(S.stats.hits/S.stats.swings*100)+"%" : "-";
   document.getElementById("s-kill").textContent = meta.kills;
   document.getElementById("bl-stats").textContent = `${playerAtk()} / ${playerMaxHp()} / ${playerMaxSt()}`;
-  document.getElementById("bl-stance").textContent = STANCES[meta.stance].name;
-  document.getElementById("bl-combo").textContent = meta.combo;
+  document.getElementById("bl-stance").textContent = `${STANCES[meta.stance].name} / ${meta.combo}`;
+  const pd = [];
+  if (S.p.debuffs.burn>0) pd.push(`灼烧${S.p.debuffs.burn}`);
+  if (S.p.debuffs.breakd>0) pd.push(`破防${S.p.debuffs.breakd}`);
+  if (S.p.debuffs.vuln>0) pd.push(`易伤${S.p.debuffs.vuln}`);
+  document.getElementById("bl-pdeb").textContent = pd.length ? pd.join(" ") : "无";
+  document.getElementById("bl-pot").textContent = meta.potions;
   document.getElementById("stance-cost").textContent = STANCES[meta.stance].name;
   document.getElementById("btn-finisher").style.display = meta.combo >= 3 && !S.over ? "block" : "none";
-  document.getElementById("bl-pot").textContent = meta.potions;
   document.getElementById("bl-relics").innerHTML = meta.relics.length
     ? meta.relics.map(id => { const r = RELICS.find(x=>x.id===id); return `<span>${r?r.name:id}</span>`; }).join("")
     : `<span style="opacity:.4">暂无遗物</span>`;
@@ -935,9 +1166,11 @@ function renderUI(){
 /* ==================== 启动 ==================== */
 meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0, combo:0, stance:"neutral" };
 S = { frame:0, turn:0, over:true, log:[],
-      p:{ hp:100, st:100, guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0} },
-      stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0} };
-E = { type:"guard", name:"-", desc:"", maxhp:1, hp:1, poise:1, maxpoise:1, atk:0, def:0, phase:1, stunned:0, shield:0, maxshield:0, chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0} };
+      p:{ hp:110, st:100, guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0} },
+      stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
+E = { type:"guard", name:"-", desc:"", maxhp:1, hp:1, poise:1, maxpoise:1, atk:0, def:0, phase:1, stunned:0,
+      shield:0, maxshield:0, chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0}, intent:null, guarding:false,
+      lifesteal:0, blink:0, thorns:0, swift:false, debuffOnHit:false, affix:null, affixName:"" };
 showMenu();
 </script>
 </body>
