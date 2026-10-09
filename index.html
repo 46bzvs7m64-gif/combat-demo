@@ -138,10 +138,10 @@
 "use strict";
 /* ==================== 配置 ==================== */
 const ENEMIES = {
-  guard:     { name:"回廊守卫", hp:320, atk:20, def:30, poise:60, desc:"半血狂暴" },
-  berserker: { name:"血狂战士", hp:230, atk:27, def:15, poise:45, desc:"低血嗜血双动" },
-  sorcerer:  { name:"咒术师",   hp:260, atk:23, def:20, poise:70, shield:.22, desc:"护盾+蓄力" },
-  lord:      { name:"回廊之主", hp:540, atk:24, def:35, poise:95, desc:"三阶段" },
+  guard:     { name:"回廊守卫", hp:150, atk:10, def:25, poise:50, desc:"半血狂暴" },
+  berserker: { name:"血狂战士", hp:120, atk:13, def:10, poise:40, desc:"低血嗜血双动" },
+  sorcerer:  { name:"咒术师",   hp:130, atk:12, def:15, poise:60, shield:.22, desc:"护盾+蓄力" },
+  lord:      { name:"回廊之主", hp:240, atk:14, def:25, poise:90, desc:"三阶段" },
 };
 
 const ELEMENTS = {
@@ -179,7 +179,7 @@ const RELICS = [
   { id:"thorn",  name:"荆棘盾",   desc:"格挡反弹 30% 承受前伤害" },
   { id:"hammer", name:"碎甲锤",   desc:"削韧 +50%" },
   { id:"leech",  name:"吸血剑",   desc:"伤害 12% 转化生命（至多 8）" },
-  { id:"will",   name:"战意",     desc:"每回合体力回复 6 → 11" },
+  { id:"will",   name:"战意",     desc:"每回合体力回复 10 → 16" },
   { id:"pouch",  name:"老兵药囊", desc:"药剂 +1，恢复 30 → 40" },
   { id:"hunter", name:"猎人直觉", desc:"处决 3.0× → 4.0×" },
 ];
@@ -194,8 +194,8 @@ const FLOOR_SOULS = f => 8 + f*4;
 
 /* ==================== 存档与全局 ==================== */
 let meta = null, S = null, E = null;
-const playerAtk  = () => 22 + (meta?meta.up.atk:0)*4;
-const playerMaxHp= () => 100 + (meta?meta.up.hp:0)*20;
+const playerAtk  = () => 26 + (meta?meta.up.atk:0)*4;
+const playerMaxHp= () => 110 + (meta?meta.up.hp:0)*20;
 const playerMaxSt= () => 100 + (meta?meta.up.st:0)*15;
 const hasRelic = id => meta && meta.relics.includes(id);
 const defRed = d => 1 - d/(d+100);
@@ -572,7 +572,7 @@ function playerAct(kind){
   if (kind === "potion" && meta.potions <= 0) return;
   lockUI();
   S.turn++; S.frame += 2;
-  p.st = Math.min(playerMaxSt(), p.st + (hasRelic("will")?11:6));
+  p.st = Math.min(playerMaxSt(), p.st + (hasRelic("will")?16:10));
   p.guard = false;
   const h = `<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> `;
 
@@ -656,7 +656,7 @@ function playerAct(kind){
         if (mv.elem === "fire" && E.debuffs.burn < DEBUFFS.burn.max){ E.debuffs.burn++; sysLog(`灼烧叠加（${E.debuffs.burn}层）`); }
         if (mv.elem === "thunder" && E.debuffs.breakd < DEBUFFS.breakd.max){ E.debuffs.breakd++; sysLog(`破防叠加（${E.debuffs.breakd}层）`); }
         if (mv.elem === "dark" && E.debuffs.vuln < DEBUFFS.vuln.max){ E.debuffs.vuln++; sysLog(`易伤叠加（${E.debuffs.vuln}层）`); }
-        if (E.poise === 0) sysLog("⚠ 敌人韧性破！出现处决窗口");
+        if (E.poise === 0){ sysLog("⚠ 敌人韧性破！倒地 1 回合，出现处决窗口"); E.stunned = 1; }
         V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-70, flip:1 };
         V.e.flash = 1; V.shake = kind==="heavy"?9:5;
         burst(E_BASE.x+V.e.ox-30, E_BASE.y-70, crit?18:10, crit?"#ffd76e":"#ff8a8a", 2.2, 0.8);
