@@ -87,6 +87,8 @@
         <div class="act" data-k="dodge"><div class="nm">闪避</div><div class="cost">体力 20</div><div class="desc">完全规避 · 反击必暴</div></div>
         <div class="act" data-k="riposte" id="btn-riposte" style="display:none"><div class="nm" style="color:#c792ea">处决</div><div class="cost">韧性已破</div><div class="desc">3.0× 无视防御</div></div>
         <div class="act" data-k="potion"><div class="nm">药剂</div><div class="cost" id="pot-cost">剩 2</div><div class="desc">恢复 30 HP</div></div>
+        <div class="act" onclick="switchStance()"><div class="nm">站位</div><div class="cost" id="stance-cost">中立</div><div class="desc">切换战斗姿态</div></div>
+        <div class="act" data-k="finisher" id="btn-finisher" style="display:none"><div class="nm" style="color:#ffd76e">终结技</div><div class="cost">连击 3 层</div><div class="desc">4× 必暴击</div></div>
       </div>
     </div>
 
@@ -94,6 +96,8 @@
       <div class="panel">
         <h2>我的 Build <span class="hint">加点与遗物</span></h2>
         <div class="build-line"><span>攻击 / 生命 / 体力</span><b id="bl-stats">-</b></div>
+        <div class="build-line"><span>站位</span><b id="bl-stance">中立</b></div>
+        <div class="build-line"><span>连击</span><b id="bl-combo">0</b></div>
         <div class="build-line"><span>药剂持有</span><b id="bl-pot">-</b></div>
         <div class="relic-tags" id="bl-relics"></div>
       </div>
@@ -115,9 +119,11 @@
       <div class="panel">
         <h2>伤害公式</h2>
         <div class="help" style="margin:0;font-size:10.5px;line-height:1.8">
-          伤害 = <span style="color:#c792ea">ATK×倍率×防御减免×暴击×浮动</span><br>
+          伤害 = <span style="color:#c792ea">ATK×倍率×防御减免×暴击×浮动×元素克制</span><br>
           暴击 1.5×（闪避反击可 2.0×）· 格挡 ×0.3 · 护盾 ×0.5 · 蓄力目标受伤 +50%<br>
-          韧性破 → 处决 3.0× 无视防御
+          韧性破 → 处决 3.0× 无视防御 · 连击满3层 → 终结技 4.0×<br>
+          站位：前压命中+15%受伤+20% / 后撤命中-10%受伤-20%<br>
+          灼烧-8HP/回合 · 破防防御-50% · 易伤受伤+30%
         </div>
       </div>
     </div>
@@ -137,6 +143,29 @@ const ENEMIES = {
   sorcerer:  { name:"咒术师",   hp:260, atk:23, def:20, poise:70, shield:.22, desc:"护盾+蓄力" },
   lord:      { name:"回廊之主", hp:540, atk:24, def:35, poise:95, desc:"三阶段" },
 };
+
+const ELEMENTS = {
+  fire:  { name:"火", color:"#ff7a4a", weakBonus:1.5 },
+  thunder:{ name:"雷", color:"#ffd76e", weakBonus:1.5 },
+  dark:  { name:"暗", color:"#c792ea", weakBonus:1.5 },
+};
+const WEAKNESS = {
+  guard:     "thunder",
+  berserker: "fire",
+  sorcerer:  "dark",
+  lord:      "any",
+};
+const DEBUFFS = {
+  burn:   { name:"灼烧", max:3, dot:8,   color:"#ff7a4a" },
+  breakd: { name:"破防", max:3, defPen:.5, color:"#ffd76e" },
+  vuln:   { name:"易伤", max:3, dmgUp:.3, color:"#c792ea" },
+};
+const STANCES = {
+  neutral: { name:"中立", hit:0,   taken:1.0 },
+  aggro:   { name:"前压", hit:0.15, taken:1.2 },
+  def:     { name:"后撤", hit:-0.1, taken:0.8 },
+};
+
 const FLOOR_PLAN = f =>
   f===1 ? ["guard"] :
   f===2 ? ["guard","berserker"] :
@@ -368,6 +397,12 @@ function drawHUD(){
   drawBar(ex, 128, 165, De.hp/E.maxhp, "#e04a4a", `${E.name}  ${Math.ceil(De.hp)}/${E.maxhp}`);
   drawBar(ex, 146, 165, De.poise/E.maxpoise, "#d9a441", `韧性 ${Math.ceil(De.poise)}${E.poise===0?"  → 可处决":""}`);
   if (E.maxshield) drawBar(ex, 164, 165, De.shd/E.maxshield, "#7a5fc9", `护盾 ${Math.ceil(De.shd)}`);
+  // Debuff 标签
+  let debuffTxt = "";
+  if (E.debuffs.burn > 0) debuffTxt += `灼烧${E.debuffs.burn} `;
+  if (E.debuffs.breakd > 0) debuffTxt += `破防${E.debuffs.breakd} `;
+  if (E.debuffs.vuln > 0) debuffTxt += `易伤${E.debuffs.vuln} `;
+  if (debuffTxt){ cx.font = "bold 9px Microsoft YaHei"; cx.fillStyle = "#ff7a4a"; cx.fillText(debuffTxt, ex, 92); }
   cx.font = "bold 10px Microsoft YaHei";
   cx.fillStyle = E.phase===1 ? "#a8b3ff" : "#ff9c9c";
   cx.fillText(E.phase===1 ? (E.type==="lord"?"第 1 阶段":E.desc) : (E.phase===3?"最终阶段":"阶段 2 · 狂暴"), ex, 108);
@@ -465,7 +500,7 @@ function startFloor(){
   const pool = FLOOR_PLAN(meta.floor);
   spawnEnemy(pool[Math.floor(Math.random()*pool.length)]);
   S = { frame:0, turn:0, over:false, log:[],
-        p:{ hp:playerMaxHp(), st:playerMaxSt(), guard:false, dodgeBuff:false },
+        p:{ hp:playerMaxHp(), st:playerMaxSt(), guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0} },
         stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
   Dp.hp = S.p.hp; Dp.st = S.p.st; De.hp = E.hp; De.poise = E.poise; De.shd = E.shield;
   V.p = { ox:0, flash:0, ghost:0, block:0, visible:1 };
@@ -483,24 +518,56 @@ function spawnEnemy(key){
     maxhp:Math.round(t.hp*sHp), atk:+(t.atk*sAtk).toFixed(1), def:t.def,
     maxpoise:Math.round(t.poise*(1+.08*(Math.min(f,5)-1))),
     phase:1, stunned:0, shield:0, maxshield:t.shield?Math.round(t.hp*sHp*t.shield):0,
-    chargeNext:false };
+    chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0} };
   E.hp = E.maxhp; E.poise = E.maxpoise;
   if (E.maxshield) E.shield = E.maxshield;
 }
-const playerDmg = (mult, targetDef, crit, critMult) =>
-  Math.max(1, Math.round(playerAtk()*mult*defRed(targetDef)*(crit?critMult:1)*(0.9+Math.random()*0.2)));
+const playerDmg = (mult, targetDef, crit, critMult, elem) => {
+  let def = targetDef;
+  if (E.debuffs.breakd > 0) def = Math.round(def * (1 - DEBUFFS.breakd.defPen));
+  let d = playerAtk() * mult * defRed(def) * (crit ? critMult : 1) * (0.9 + Math.random()*0.2);
+  if (elem && WEAKNESS[E.type] === elem) d *= ELEMENTS[elem].weakBonus;
+  if (elem && WEAKNESS[E.type] === "any") d *= 1.2;
+  if (E.debuffs.vuln > 0) d *= (1 + DEBUFFS.vuln.dmgUp);
+  return Math.max(1, Math.round(d));
+};
 const enemyDmg = mult => Math.max(1, Math.round(E.atk*mult*(0.9+Math.random()*0.2)));
 
 /* ---- 玩家行动 ---- */
 document.querySelectorAll("#actions .act").forEach(el => {
-  el.addEventListener("click", () => playerAct(el.dataset.k));
+  if (el.dataset.k) el.addEventListener("click", () => playerAct(el.dataset.k));
 });
 function lockUI(){ document.querySelectorAll("#actions .act").forEach(el => el.classList.add("lock")); }
 function unlockUI(){ document.querySelectorAll("#actions .act").forEach(el => el.classList.remove("lock")); }
 
+function switchStance(){
+  if (inputLocked || S.over) return;
+  const order = ["neutral", "aggro", "def"];
+  const i = order.indexOf(meta.stance);
+  meta.stance = order[(i+1)%3];
+  sysLog(`切换站位：${STANCES[meta.stance].name}（命中${STANCES[meta.stance].hit>0?"+":""}${Math.round(STANCES[meta.stance].hit*100)}%，受伤×${STANCES[meta.stance].taken}）`);
+  saveGame(); renderUI();
+}
 function playerAct(kind){
   if (!S || S.over || inputLocked) return;
   const p = S.p;
+  if (kind === "finisher"){
+    if (meta.combo < 3){ sysLog("连击不足（需 3 层）"); return; }
+    meta.combo = 0;
+    const d = Math.round(playerAtk() * 4.0 * 1.5); // 4× 必暴击
+    runSeq([
+      { dur:400, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-60)*t; V.shake = 6; } },
+      { dur:200, start:()=>{
+          S.stats.dmg += d; E.hp = Math.max(0, E.hp-d);
+          burst(E_BASE.x-20, E_BASE.y-70, 40, "#ffd76e", 4, 2);
+          floatText(E_BASE.x-10, E_BASE.y-160, `${d}!!`, "#ffd76e", 36);
+          V.shake = 18;
+          addLog(`<span class="crit">终结技</span> → ${d} 伤害（4× 必暴击）`);
+        } },
+      { dur:300, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-60)*(1-t); } },
+    ], () => afterPlayerAttack(true));
+    return;
+  }
   if (kind === "riposte" && E.poise > 0) return;
   if (kind === "potion" && meta.potions <= 0) return;
   lockUI();
@@ -536,7 +603,7 @@ function playerAct(kind){
   }
   if (kind === "riposte"){
     const mult = hasRelic("hunter")?4.0:3.0;
-    const d = Math.round(playerAtk()*mult*1.5);
+    const d = Math.round(playerAtk()*mult*1.5); // 暗属性，不触发弱点（处决已无视防御）
     runSeq([
       { dur:300, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-70)*t; } },
       { dur:160, start:()=>{
@@ -552,14 +619,15 @@ function playerAct(kind){
   }
   // 攻击
   const mv = kind === "light"
-    ? { name:"轻击", cost:25, startup:2, recovery:1, mult:1.0, poiseDmg:hasRelic("hammer")?15:10, critBase:.15 }
-    : { name:"重击", cost:40, startup:4, recovery:3, mult:1.8, poiseDmg:hasRelic("hammer")?38:25, critBase:.15 };
+    ? { name:"轻击", cost:25, startup:2, recovery:1, mult:1.0, poiseDmg:hasRelic("hammer")?15:10, critBase:.15, elem:"fire" }
+    : { name:"重击", cost:40, startup:4, recovery:3, mult:1.8, poiseDmg:hasRelic("hammer")?38:25, critBase:.15, elem:"thunder" };
   if (p.st < mv.cost){ sysLog(`体力不足（需 ${mv.cost}，当前 ${Math.floor(p.st)}）`); S.turn--; renderUI(); return; }
   p.st -= mv.cost;
   S.frame += mv.startup;
-  const crit = (p.dodgeBuff && kind==="light") || Math.random() < mv.critBase + (hasRelic("eagle")?.12:0);
+  const stanceHit = STANCES[meta.stance].hit;
+  const crit = (p.dodgeBuff && kind==="light") || Math.random() < (mv.critBase + stanceHit + (hasRelic("eagle")?.12:0));
   const critMult = (p.dodgeBuff && kind==="light" && hasRelic("razor")) ? 2.0 : 1.5;
-  const d0 = playerDmg(mv.mult, E.def, crit, critMult);
+  const d0 = playerDmg(mv.mult, E.def, crit, critMult, mv.elem);
   let d = d0, shTxt = "";
   if (E.shield > 0){
     const abs = Math.min(E.shield, Math.round(d*0.5));
@@ -568,6 +636,8 @@ function playerAct(kind){
   if (E.chargeNext){ d = Math.round(d*1.5); shTxt += " 蓄力目标受伤+50%"; }
   S.stats.swings++; S.stats.hits++;
   if (crit) S.stats.crits++;
+  meta.combo++;
+  if (meta.combo >= 3) sysLog("⚡ 连击满 3 层，终结技解锁！");
   const reach = kind==="light" ? 90 : 120;
   runSeq([
     { dur:120+mv.startup*70, update:t=>{ V.p.ox = reach*t*t; } },
@@ -582,12 +652,18 @@ function playerAct(kind){
         if (hasRelic("leech") && d>0){ const hl = Math.min(8, Math.round(d*.12));
           p.hp = Math.min(playerMaxHp(), p.hp+hl);
           addLog(`吸血剑 <span class="heal">+${hl} HP</span>`); }
+        // 元素Debuff
+        if (mv.elem === "fire" && E.debuffs.burn < DEBUFFS.burn.max){ E.debuffs.burn++; sysLog(`灼烧叠加（${E.debuffs.burn}层）`); }
+        if (mv.elem === "thunder" && E.debuffs.breakd < DEBUFFS.breakd.max){ E.debuffs.breakd++; sysLog(`破防叠加（${E.debuffs.breakd}层）`); }
+        if (mv.elem === "dark" && E.debuffs.vuln < DEBUFFS.vuln.max){ E.debuffs.vuln++; sysLog(`易伤叠加（${E.debuffs.vuln}层）`); }
         if (E.poise === 0) sysLog("⚠ 敌人韧性破！出现处决窗口");
         V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-70, flip:1 };
         V.e.flash = 1; V.shake = kind==="heavy"?9:5;
         burst(E_BASE.x+V.e.ox-30, E_BASE.y-70, crit?18:10, crit?"#ffd76e":"#ff8a8a", 2.2, 0.8);
         floatText(E_BASE.x+V.e.ox-20, E_BASE.y-150, `${d}`, crit?"#ffd76e":"#ff8a8a", crit?27:21);
-        addLog(`${h}玩家 <b>${mv.name}</b> → ${crit?`<span class="crit">暴击 ${d}</span>`:`<span class="dmg">${d}</span>`} · 削韧 ${mv.poiseDmg}${shTxt}`);
+        let elemTxt = "";
+        if (mv.elem && WEAKNESS[E.type] === mv.elem) elemTxt = ` <span style="color:${ELEMENTS[mv.elem].color}">⚡弱点克制！</span>`;
+        addLog(`${h}玩家 <b>${mv.name}</b>（${ELEMENTS[mv.elem].name}）→ ${crit?`<span class="crit">暴击 ${d}</span>`:`<span class="dmg">${d}</span>`} · 削韧 ${mv.poiseDmg}${shTxt}${elemTxt}`);
       }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); } },
     { dur:140+mv.recovery*60, update:t=>{ V.p.ox = reach*(1-t); } },
   ], () => afterPlayerAttack(false));
@@ -677,6 +753,7 @@ function enemyHit(mult, name, ranged){
   const base = enemyDmg(mult);
   let final = base, note = "";
   V.p.flash = 1;
+  final = Math.round(final * STANCES[meta.stance].taken);
   if (p.dodgeBuff){ final = 0; note = `<span class="heal">被闪避！</span>`;
     floatText(P_BASE.x, P_BASE.y-140, "MISS", "#7fd8a0", 20); }
   else if (p.guard){
@@ -697,10 +774,23 @@ function enemyHit(mult, name, ranged){
     floatText(P_BASE.x, P_BASE.y-150, `${final}`, "#ff8a8a", 22);
   }
   p.dodgeBuff = false;
+  if (final > 0 && meta.combo > 0){ meta.combo = 0; sysLog("连击被打断！"); }
   addLog(`<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> <b>${E.name}</b> <b>${name}</b> → ${final>0?`<span class="dmg">${final}</span> 伤害`:`<span class="heal">0 伤害</span>`} ${note}`);
   flushLog(); renderUI();
 }
+function applyDebuffs(){
+  const p = S.p;
+  // 玩家Debuff
+  if (p.debuffs.burn > 0){ p.hp = Math.max(0, p.hp - DEBUFFS.burn.dot); sysLog(`灼烧伤害 -${DEBUFFS.burn.dot} HP`); }
+  // 敌人Debuff
+  if (E.debuffs.burn > 0){ E.hp = Math.max(0, E.hp - DEBUFFS.burn.dot); sysLog(`敌方灼烧 -${DEBUFFS.burn.dot} HP`); }
+  // 检查死亡
+  if (E.hp <= 0){ killEnemy(); return true; }
+  if (p.hp <= 0){ playerDie(); return true; }
+  return false;
+}
 function endRound(){
+  if (applyDebuffs()) return;
   if (S.over) return;
   if (E.hp <= 0){ killEnemy(); return; }
   if (S.p.hp <= 0){ playerDie(); return; }
@@ -747,7 +837,7 @@ function showMenu(){
   `);
 }
 function newRun(){
-  meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0 };
+  meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0, combo:0, stance:"neutral" };
   saveGame(); startFloor();
 }
 function continueRun(){
@@ -830,6 +920,10 @@ function renderUI(){
   document.getElementById("s-hit").textContent = S.stats.swings>0 ? Math.round(S.stats.hits/S.stats.swings*100)+"%" : "-";
   document.getElementById("s-kill").textContent = meta.kills;
   document.getElementById("bl-stats").textContent = `${playerAtk()} / ${playerMaxHp()} / ${playerMaxSt()}`;
+  document.getElementById("bl-stance").textContent = STANCES[meta.stance].name;
+  document.getElementById("bl-combo").textContent = meta.combo;
+  document.getElementById("stance-cost").textContent = STANCES[meta.stance].name;
+  document.getElementById("btn-finisher").style.display = meta.combo >= 3 && !S.over ? "block" : "none";
   document.getElementById("bl-pot").textContent = meta.potions;
   document.getElementById("bl-relics").innerHTML = meta.relics.length
     ? meta.relics.map(id => { const r = RELICS.find(x=>x.id===id); return `<span>${r?r.name:id}</span>`; }).join("")
@@ -839,11 +933,11 @@ function renderUI(){
 }
 
 /* ==================== 启动 ==================== */
-meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0 };
+meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0, combo:0, stance:"neutral" };
 S = { frame:0, turn:0, over:true, log:[],
-      p:{ hp:100, st:100, guard:false, dodgeBuff:false },
-      stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
-E = { type:"guard", name:"-", desc:"", maxhp:1, hp:1, poise:1, maxpoise:1, atk:0, def:0, phase:1, stunned:0, shield:0, maxshield:0, chargeNext:false };
+      p:{ hp:100, st:100, guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0} },
+      stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0} };
+E = { type:"guard", name:"-", desc:"", maxhp:1, hp:1, poise:1, maxpoise:1, atk:0, def:0, phase:1, stunned:0, shield:0, maxshield:0, chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0} };
 showMenu();
 </script>
 </body>
