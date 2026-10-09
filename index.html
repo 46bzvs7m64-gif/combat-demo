@@ -220,14 +220,15 @@ const cv = document.getElementById("cv"), cx = cv.getContext("2d");
 const W = cv.width, H = cv.height;
 const P_BASE = { x:225, y:318 }, E_BASE = { x:735, y:318 };
 const V = {
-  p:{ ox:0, oy:0, flash:0, ghost:0, block:0, visible:1 },
-  e:{ ox:0, flash:0, visible:1, aura:0, charge:0 },
-  slash:{ show:0, x:0, y:0, flip:1, cross:0 },
+  p:{ ox:0, oy:0, flash:0, ghost:0, block:0, visible:1, kb:0 },
+  e:{ ox:0, flash:0, visible:1, aura:0, charge:0, kb:0, telegraph:0 },
+  slash:{ show:0, x:0, y:0, flip:1, cross:0, angle:0, rad:46 },
   ring:{ show:0, x:0, y:0, r:0 },
   proj:{ show:0, x:0, y:0, r:6 },
-  shake:0, fullflash:0, dim:0, t:0,
+  shake:0, fullflash:0, dim:0, t:0, hitstop:0,
+  comboCount:0, comboTimer:0,
 };
-let particles = [], floaters = [];
+let particles = [], floaters = [], afterimages = [], slashTrail = [];
 const Dp = { hp:110, st:100 }, De = { hp:1, poise:1, shd:0 };
 
 function burst(x, y, n, color, speed, up){
@@ -460,7 +461,9 @@ function drawHUD(){
 /* ---- 主循环 ---- */
 let lastT = 0;
 function loop(ts){
-  const dt = Math.min(50, ts - lastT || 16); lastT = ts; V.t += dt;
+  const rawDt = Math.min(50, ts - lastT || 16); lastT = ts; V.t += rawDt;
+  let dt = rawDt;
+  if (V.hitstop > 0){ dt = 0; V.hitstop -= rawDt; } // 命中停顿：物理冻结但计时继续
   tickQueue(dt);
   if (S && E){
     const k = Math.min(1, dt * 0.012);
@@ -475,17 +478,37 @@ function loop(ts){
   V.dim = Math.max(0, V.dim - dt*0.002);
   V.fullflash = Math.max(0, V.fullflash - dt*0.004);
   if (S && S.p && !S.p.guard) V.p.block = Math.max(0, V.p.block - dt*0.005);
+  // 击退衰减
+  V.p.kb *= Math.pow(0.85, dt/16); V.e.kb *= Math.pow(0.85, dt/16);
+  if (Math.abs(V.p.kb)<0.5) V.p.kb=0; if (Math.abs(V.e.kb)<0.5) V.e.kb=0;
+  // 连击计数器
+  V.comboTimer = Math.max(0, V.comboTimer - dt);
+  if (V.comboTimer <= 0) V.comboCount = 0;
+  V.e.telegraph = Math.max(0, V.e.telegraph - dt*0.003);
+  // 残影衰减
+  afterimages = afterimages.filter(a => (a.life -= dt*0.005) > 0);
+  // 剑痕拖尾衰减
+  slashTrail = slashTrail.filter(s => (s.life -= dt*0.006) > 0);
   drawBG();
   if (S && E){
-    const px = P_BASE.x + V.p.ox, ex = E_BASE.x + V.e.ox;
+    const px = P_BASE.x + V.p.ox + V.p.kb, ex = E_BASE.x + V.e.ox + V.e.kb;
     shadow(px, P_BASE.y, 26); shadow(ex, E_BASE.y, 30);
     if (V.proj.show > 0){
       const pg = cx.createRadialGradient(V.proj.x,V.proj.y,1,V.proj.x,V.proj.y,V.proj.r+6);
       pg.addColorStop(0,"rgba(220,150,255,.95)"); pg.addColorStop(1,"rgba(140,80,255,0)");
       cx.fillStyle = pg; cx.beginPath(); cx.arc(V.proj.x,V.proj.y,V.proj.r+6,0,7); cx.fill();
     }
+    // 玩家残影
+    afterimages.forEach(a => { if (a.who==='p'){ cx.globalAlpha = a.life*0.35; drawPlayerBody(P_BASE.x+a.ox, P_BASE.y-V.p.oy); cx.globalAlpha = 1; } });
     drawEnemy(ex, E_BASE.y);
     drawPlayer(px, P_BASE.y);
+    // 剑痕拖尾
+    slashTrail.forEach(s => {
+      cx.globalAlpha = s.life*0.7;
+      cx.strokeStyle = s.color; cx.lineWidth = 5*s.life; cx.lineCap = "round";
+      cx.beginPath(); cx.arc(s.x, s.y, s.r, s.a0, s.a1); cx.stroke();
+      cx.globalAlpha = 1;
+    });
     if (V.slash.show > 0.02){
       const s = V.slash;
       cx.strokeStyle = `rgba(255,255,255,${s.show})`; cx.lineWidth = 5; cx.lineCap = "round";
@@ -525,6 +548,30 @@ function loop(ts){
     if (f.big){ cx.strokeStyle = "rgba(20,10,30,.9)"; cx.lineWidth = 4; cx.strokeText(f.txt, f.x, f.y); }
     cx.fillText(f.txt, f.x, f.y); cx.globalAlpha = 1;
   });
+  // 连击计数器（屏幕右上角）
+  if (V.comboCount >= 2){
+    const cxp = W - 80, cyp = 60 + Math.sin(V.t/90)*2;
+    const scale = 1 + 0.25*Math.exp(-V.comboTimer/120);
+    cx.save(); cx.translate(cxp, cyp); cx.scale(scale, scale);
+    cx.font = "bold 30px Microsoft YaHei"; cx.textAlign = "right";
+    cx.lineWidth = 4; cx.strokeStyle = "rgba(20,10,30,.9)";
+    cx.strokeText(`${V.comboCount}`, 0, 0);
+    cx.fillStyle = V.comboCount>=5 ? "#ff5a7a" : "#ffd76e";
+    cx.fillText(`${V.comboCount}`, 0, 0);
+    cx.font = "bold 11px Microsoft YaHei";
+    cx.fillStyle = "#e8e8f0"; cx.fillText("COMBO", 0, 16);
+    cx.restore();
+  }
+  // 敌人预警（蓄力/大招收手前红光脉冲）
+  if (V.e.telegraph > 0.02 && E){
+    const ex = E_BASE.x + V.e.ox;
+    cx.save();
+    cx.globalAlpha = V.e.telegraph * (0.5 + 0.5*Math.sin(V.t/60));
+    const tg = cx.createRadialGradient(ex, E_BASE.y-70, 10, ex, E_BASE.y-70, 100);
+    tg.addColorStop(0,"rgba(255,60,60,0)"); tg.addColorStop(.7,"rgba(255,40,40,.4)"); tg.addColorStop(1,"rgba(255,40,40,0)");
+    cx.fillStyle = tg; cx.beginPath(); cx.arc(ex, E_BASE.y-70, 100, 0, 7); cx.fill();
+    cx.restore();
+  }
   cx.restore();
   requestAnimationFrame(loop);
 }
@@ -791,7 +838,7 @@ function playerAct(kind){
   if (kind === "light"){
     // 双段斩
     runSeq([
-      { dur:160, update:t=>{ V.p.ox = 92*t*t; } },
+      { dur:160, update:t=>{ V.p.ox = 92*t*t; if (Math.random()<.5) afterimages.push({who:'p',ox:V.p.ox,life:1}); } },
       { dur:130, start:()=>{
           S.frame += 1;
           hitEnemy(d, crit, mv, shTxt, elemTxt, 1);
@@ -811,7 +858,7 @@ function playerAct(kind){
     // 跳劈
     const reach = 120;
     runSeq([
-      { dur:260, update:t=>{ V.p.ox = reach*0.4*t; V.p.oy = 70*Math.sin(t*Math.PI*0.5); } },
+      { dur:260, update:t=>{ V.p.ox = reach*0.4*t; V.p.oy = 70*Math.sin(t*Math.PI*0.5); if (Math.random()<.4) afterimages.push({who:'p',ox:V.p.ox,life:1}); } },
       { dur:150, start:()=>{
           S.frame += mv.recovery;
           hitEnemy(d, crit, mv, shTxt, elemTxt, 1);
@@ -826,6 +873,15 @@ function playerAct(kind){
 }
 function hitEnemy(d, crit, mv, shTxt, elemTxt, poiseMul){
   const p = S.p;
+  // 命中停顿：重击/暴击更长
+  V.hitstop = crit ? 110 : (mv.name === "重击" ? 90 : 55);
+  V.comboCount++; V.comboTimer = 1400;
+  // 击退（朝向敌人方向）
+  V.e.kb = -26 - (crit?16:0);
+  // 剑痕拖尾
+  const flip = mv.name === "轻击" ? 1 : 1;
+  const col = ELEMENTS[mv.elem].color;
+  slashTrail.push({ x:E_BASE.x+V.e.ox-34, y:E_BASE.y-70, r:46, a0:-1.4, a1:1.0, color:col, life:1 });
   E.hp = Math.max(0, E.hp - d);
   E.shield = Math.max(0, E.shield - Math.min(E.shield, Math.round(d*0) + (E.shield>0?0:0)));
   if (E.maxshield && E.shield===0){ E.poise = Math.max(0,E.poise-20); sysLog("护盾碎裂！削韧 +20"); }
@@ -916,7 +972,7 @@ function enemyPhase(){
         burst(E_BASE.x, E_BASE.y-80, 24, "#ff6a6a", 2.8, 1.5);
         floatText(E_BASE.x, E_BASE.y-170, "PHASE UP", "#ff9c9c", 24, { big:true });
       }, update:t=>{ V.e.aura = 0.6+0.4*Math.sin(t*Math.PI); } };
-    if (e.charge) return { dur:520, start:()=>{ addLog(`${tag()}<b>${E.name}</b> ${e.msg}`); V.e.charge = 0.1; }, update:t=>{ V.e.charge = 0.1+0.9*t; } };
+    if (e.charge) return { dur:520, start:()=>{ addLog(`${tag()}<b>${E.name}</b> ${e.msg}`); V.e.charge = 0.1; V.e.telegraph = 1; }, update:t=>{ V.e.charge = 0.1+0.9*t; V.e.telegraph = 0.6+0.4*Math.sin(t*Math.PI*4); } };
     if (e.reshield) return { dur:420, start:()=>{
         const add = Math.round(E.maxshield*e.reshield);
         E.shield = Math.min(E.maxshield, E.shield+add);
@@ -940,10 +996,10 @@ function enemyPhase(){
         burst(P_BASE.x, P_BASE.y-70, 12, "#c792ea", 2, 1);
         floatText(P_BASE.x, P_BASE.y-140, "易伤!", "#c792ea", 16, { big:true });
       } };
-    if (e.proj) return { dur:640, start:()=>{ V.proj = { show:1, x:E_BASE.x, y:E_BASE.y-90, r:10 }; },
-        update:t=>{ V.proj.x = E_BASE.x + (P_BASE.x-E_BASE.x)*t; V.proj.y = E_BASE.y-90 + Math.sin(t*Math.PI)*30; },
+    if (e.proj) return { dur:640, start:()=>{ V.proj = { show:1, x:E_BASE.x, y:E_BASE.y-90, r:10 }; V.e.telegraph = 0.6; },
+        update:t=>{ V.proj.x = E_BASE.x + (P_BASE.x-E_BASE.x)*t; V.proj.y = E_BASE.y-90 + Math.sin(t*Math.PI)*30; V.e.telegraph = 0.6*(1-t); },
         end:()=>{ V.proj.show = 0; V.e.charge = 0; enemyHit(e.mult, e.name, true, e.drain); } };
-    return { dur:e.heavy?640:520, start:()=>{ V.e.ox = 0; }, update:t=>{
+    return { dur:e.heavy?640:520, start:()=>{ V.e.ox = 0; if (e.heavy){ V.e.telegraph = 1; V.shake = 4; } }, update:t=>{
         const dist = (E_BASE.x-P_BASE.x-80);
         if (e.heavy){
           if (t < .5){ V.e.ox = -dist*Math.sin(t*Math.PI*0.5)*0.4; }
@@ -963,6 +1019,8 @@ function enemyHit(mult, name, ranged, drain){
   const base = enemyDmg(mult);
   let final = base, note = "";
   V.p.flash = 1;
+  V.hitstop = 60; // 受击停顿
+  V.p.kb = 26;    // 玩家被击退
   final = Math.round(final * STANCES[meta.stance].taken);
   if (p.dodgeBuff){ final = 0; note = `<span class="heal">被闪避！</span>`;
     floatText(P_BASE.x, P_BASE.y-140, "MISS", "#7fd8a0", 20); }
