@@ -3,202 +3,139 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>试炼回廊 · 肉鸽回合制战斗</title>
+<title>试炼回廊 · Canvas 动作回合制战斗</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#1a1a2e; background:#12121f; padding:16px; }
+  body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#1a1a2e; background:#0c0c16; padding:14px; }
   .container { max-width:1080px; margin:0 auto; }
-  h1 { font-size:22px; color:#e8e8f0; }
-  .subtitle { font-size:12px; color:#8a8aa0; margin:4px 0 14px; }
-  .layout { display:flex; gap:14px; align-items:flex-start; }
-  .arena { flex:1.6; min-width:0; }
-  .side { flex:1; min-width:0; }
-  .panel { background:#1c1c30; border:1px solid #2e2e4a; border-radius:10px; padding:14px; margin-bottom:14px; }
-  .panel h2 { font-size:13px; color:#a8b3ff; margin-bottom:10px; display:flex; justify-content:space-between; }
+  h1 { font-size:21px; color:#e8e8f0; }
+  .subtitle { font-size:12px; color:#8a8aa0; margin:4px 0 12px; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; background:#181828; border:1px solid #2e2e4a; border-radius:8px; padding:7px 14px; margin-bottom:10px; font-size:12px; color:#bbb; }
+  .topbar b { color:#ffd76e; }
+  .layout { display:flex; gap:12px; align-items:flex-start; }
+  .main { flex:2.2; min-width:0; }
+  .side { flex:1; min-width:250px; }
+  canvas { width:100%; display:block; border:1px solid #2e2e4a; border-radius:10px; background:#0d0d18; }
+  .panel { background:#1c1c30; border:1px solid #2e2e4a; border-radius:10px; padding:12px; margin-bottom:12px; }
+  .panel h2 { font-size:12.5px; color:#a8b3ff; margin-bottom:8px; display:flex; justify-content:space-between; }
   .panel h2 .hint { font-size:10px; color:#666; font-weight:400; }
-  .floorbar { display:flex; justify-content:space-between; align-items:center; background:#181828; border:1px solid #2e2e4a; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:12px; color:#bbb; }
-  .floorbar b { color:#ffd76e; }
-  .unit { margin-bottom:10px; }
-  .unit .row { display:flex; justify-content:space-between; font-size:12px; color:#ccc; margin-bottom:4px; }
-  .unit .row b { color:#fff; }
-  .unit .edesc { font-size:10px; color:#70708a; }
-  .bar { height:12px; background:#2a2a44; border-radius:6px; overflow:hidden; margin-bottom:3px; position:relative; }
-  .bar .fill { height:100%; transition:width .3s; }
-  .bar .txt { position:absolute; left:8px; top:-1px; font-size:10px; color:#fff; text-shadow:0 1px 2px #000; line-height:12px; }
-  .hp .fill { background:linear-gradient(90deg,#e04a4a,#ff7b7b); }
-  .poise .fill { background:linear-gradient(90deg,#d9a441,#ffd88a); }
-  .stam .fill { background:linear-gradient(90deg,#3f9e5f,#7fd8a0); }
-  .shd .fill { background:linear-gradient(90deg,#7a5fc9,#b3a1e8); }
-  .phase-badge { font-size:10px; padding:2px 10px; border-radius:10px; font-weight:700; }
-  .phase-badge.p1 { background:#2e2e4a; color:#a8b3ff; }
-  .phase-badge.p2 { background:#5c2424; color:#ff9c9c; animation:blink 1s infinite; }
-  @keyframes blink { 50% { opacity:.5; } }
-  .actions { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-  .act { padding:9px 6px; border:1px solid #3a3a5c; border-radius:8px; background:#23233c; color:#dde; cursor:pointer; text-align:center; transition:all .15s; }
-  .act:hover:not(:disabled) { border-color:#6673ff; background:#2b2b4d; }
-  .act:disabled { opacity:.35; cursor:not-allowed; }
+  .actions { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+  .act { padding:8px 6px; border:1px solid #3a3a5c; border-radius:8px; background:#23233c; color:#dde; cursor:pointer; text-align:center; transition:all .15s; user-select:none; }
+  .act:hover:not(.lock) { border-color:#6673ff; background:#2b2b4d; }
+  .act.lock { opacity:.35; cursor:not-allowed; }
   .act .nm { font-size:13px; font-weight:700; }
   .act .cost { font-size:10px; color:#8a8aa0; margin-top:2px; }
   .act .desc { font-size:9.5px; color:#70708a; margin-top:2px; line-height:1.35; }
-  .log { height:220px; overflow-y:auto; font-size:11px; line-height:1.7; }
+  .log { height:170px; overflow-y:auto; font-size:10.5px; line-height:1.65; }
   .log div { padding:1px 0; border-bottom:1px solid #23233c; }
-  .log .frm { color:#5f6f9f; font-size:9.5px; }
+  .log .sys { color:#8a8aa0; }
   .log .dmg { color:#ff8a8a; font-weight:700; }
   .log .crit { color:#ffd76e; font-weight:700; }
   .log .heal { color:#7fd8a0; }
-  .log .sys { color:#8a8aa0; }
-  .log .exec { color:#c792ea; font-weight:700; }
-  .stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
-  .stat-grid .st { background:#23233c; border-radius:6px; padding:6px 8px; }
-  .stat-grid .st .l { font-size:10px; color:#8a8aa0; }
-  .stat-grid .st .v { font-size:14px; font-weight:700; color:#e8e8f0; }
-  .build-line { font-size:11.5px; color:#bbb; margin-bottom:6px; display:flex; justify-content:space-between; }
+  .stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; }
+  .stat-grid .st { background:#23233c; border-radius:6px; padding:5px 8px; }
+  .stat-grid .st .l { font-size:9.5px; color:#8a8aa0; }
+  .stat-grid .st .v { font-size:13px; font-weight:700; color:#e8e8f0; }
+  .build-line { font-size:11px; color:#bbb; margin-bottom:4px; display:flex; justify-content:space-between; }
   .build-line b { color:#ffd76e; }
-  .relic-tags { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
-  .relic-tags span { font-size:10px; background:#2b2b4d; border:1px solid #4a4a7a; color:#c7b3ff; border-radius:10px; padding:2px 9px; }
-  .formula { font-size:10.5px; color:#9aa; line-height:1.8; }
-  .formula code { color:#c792ea; background:#23233c; padding:1px 5px; border-radius:4px; font-size:10px; }
-  .footer { text-align:center; font-size:11px; color:#666; margin-top:16px; }
-  /* 覆盖层 */
-  .overlay { position:fixed; inset:0; background:rgba(10,10,22,.86); display:none; align-items:center; justify-content:center; z-index:50; }
+  .relic-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+  .relic-tags span { font-size:9.5px; background:#2b2b4d; border:1px solid #4a4a7a; color:#c7b3ff; border-radius:10px; padding:1px 8px; }
+  .overlay { position:fixed; inset:0; background:rgba(8,8,18,.88); display:none; align-items:center; justify-content:center; z-index:50; }
   .overlay.show { display:flex; }
-  .ov-panel { background:#1c1c30; border:1px solid #4a4a7a; border-radius:14px; padding:26px; max-width:640px; width:92%; max-height:88vh; overflow-y:auto; color:#dde; text-align:center; }
+  .ov-panel { background:#1c1c30; border:1px solid #4a4a7a; border-radius:14px; padding:24px; max-width:640px; width:92%; max-height:88vh; overflow-y:auto; color:#dde; text-align:center; }
   .ov-panel h3 { font-size:20px; color:#e8e8f0; margin-bottom:6px; }
-  .ov-panel .sub { font-size:12px; color:#8a8aa0; margin-bottom:16px; line-height:1.7; }
-  .choices { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0; }
-  .choice { background:#23233c; border:1px solid #3a3a5c; border-radius:10px; padding:14px 10px; cursor:pointer; transition:all .15s; }
+  .ov-panel .sub { font-size:12px; color:#8a8aa0; margin-bottom:14px; line-height:1.7; }
+  .choices { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:12px 0; }
+  .choice { background:#23233c; border:1px solid #3a3a5c; border-radius:10px; padding:13px 10px; cursor:pointer; transition:all .15s; }
   .choice:hover { border-color:#c792ea; background:#2b2b52; }
-  .choice .cn { font-size:13px; font-weight:700; color:#c7b3ff; margin-bottom:6px; }
+  .choice .cn { font-size:13px; font-weight:700; color:#c7b3ff; margin-bottom:5px; }
   .choice .cd { font-size:10.5px; color:#9aa; line-height:1.5; }
-  .upgrid { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; margin:14px 0; }
-  .upbtn { background:#23233c; border:1px solid #3a3a5c; border-radius:10px; padding:11px 8px; cursor:pointer; color:#dde; transition:all .15s; }
+  .upgrid { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; margin:12px 0; }
+  .upbtn { background:#23233c; border:1px solid #3a3a5c; border-radius:10px; padding:11px 8px; cursor:pointer; color:#dde; }
   .upbtn:hover:not(:disabled) { border-color:#7fd8a0; }
   .upbtn:disabled { opacity:.35; cursor:not-allowed; }
   .upbtn .un { font-size:12.5px; font-weight:700; }
   .upbtn .uc { font-size:10.5px; color:#ffd76e; margin-top:3px; }
   .upbtn .ue { font-size:10px; color:#8a8aa0; margin-top:2px; }
-  .ovbtn { display:inline-block; margin:6px 5px 0; padding:10px 26px; border:1px solid #6673ff; border-radius:8px; background:#2b2b4d; color:#dde; cursor:pointer; font-size:13px; }
+  .ovbtn { display:inline-block; margin:5px 4px 0; padding:10px 24px; border:1px solid #6673ff; border-radius:8px; background:#2b2b4d; color:#dde; cursor:pointer; font-size:13px; }
   .ovbtn:hover { background:#6673ff; }
   .ovbtn.gray { border-color:#3a3a5c; background:#23233c; }
   .soul { color:#ffd76e; font-weight:700; }
-  .help { text-align:left; font-size:11.5px; color:#9aa; line-height:1.9; margin:10px 0 16px; background:#181828; border-radius:8px; padding:12px 16px; }
-  @media (max-width:800px){ .layout{flex-direction:column;} .side{width:100%;} .choices{grid-template-columns:1fr;} }
+  .help { text-align:left; font-size:11.5px; color:#9aa; line-height:1.9; margin:10px 0 14px; background:#181828; border-radius:8px; padding:11px 15px; }
+  .footer { text-align:center; font-size:11px; color:#666; margin-top:14px; }
+  @media (max-width:820px){ .layout{flex-direction:column;} .side{width:100%;} .choices{grid-template-columns:1fr;} }
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>试炼回廊 · 肉鸽回合制战斗</h1>
-  <div class="subtitle">五层回廊 + 无尽模式 · 三类敌人 AI · 遗物三选一 · 魂加点成长 · 白盒伤害公式 · 帧级日志 · 原生 JS 零依赖</div>
+  <h1>试炼回廊 · Canvas 动作回合制战斗</h1>
+  <div class="subtitle">实时战斗动画 · 粒子与屏幕震动 · 五层回廊 + 无尽模式 · 四类敌人 AI · 遗物三选一 · 魂加点 · 白盒公式 · 帧级日志 · 全程序化绘制零图片资源</div>
+
+  <div class="topbar">
+    <span>回廊层数：<b id="ui-floor">-</b></span>
+    <span>回廊之魂：<b id="ui-souls">0</b></span>
+    <span id="ui-enemy-tag">-</span>
+  </div>
 
   <div class="layout">
-    <!-- ============ 左：战场 ============ -->
-    <div class="arena">
-      <div class="floorbar">
-        <span>回廊层数：<b id="ui-floor">-</b></span>
-        <span>回廊之魂：<b id="ui-souls">0</b></span>
-        <span id="ui-enemy-tag">-</span>
-      </div>
-
-      <div class="panel">
-        <h2>战场 <span class="hint">回合制 · 玩家先手 · 敌人按行为树行动</span></h2>
-
-        <div class="unit">
-          <div class="row"><span><b>玩家</b> · 流浪剑士</span><span id="p-cond"></span></div>
-          <div class="bar hp"><div class="fill" id="p-hp"></div><div class="txt" id="p-hp-t"></div></div>
-          <div class="bar stam"><div class="fill" id="p-st"></div><div class="txt" id="p-st-t"></div></div>
-        </div>
-
-        <div class="unit">
-          <div class="row"><span><b id="b-name">-</b> <span class="edesc" id="b-desc"></span></span><span class="phase-badge p1" id="boss-phase">-</span></div>
-          <div class="bar hp"><div class="fill" id="b-hp"></div><div class="txt" id="b-hp-t"></div></div>
-          <div class="bar poise"><div class="fill" id="b-poise"></div><div class="txt" id="b-poise-t"></div></div>
-          <div class="bar shd" id="b-shd-bar" style="display:none"><div class="fill" id="b-shd"></div><div class="txt" id="b-shd-t"></div></div>
-        </div>
-
-        <div class="actions" id="actions">
-          <div class="act" onclick="playerAct('light')">
-            <div class="nm">轻击</div><div class="cost">体力 25</div>
-            <div class="desc">前摇2帧 后摇1帧<br>1.0× 伤害 · 削韧 10</div>
-          </div>
-          <div class="act" onclick="playerAct('heavy')">
-            <div class="nm">重击</div><div class="cost">体力 40</div>
-            <div class="desc">前摇4帧 后摇3帧<br>1.8× 伤害 · 削韧 25</div>
-          </div>
-          <div class="act" onclick="playerAct('guard')">
-            <div class="nm">格挡</div><div class="cost">恢复 15 体力</div>
-            <div class="desc">受击减伤 70%<br>荆棘遗物可反弹</div>
-          </div>
-          <div class="act" onclick="playerAct('dodge')">
-            <div class="nm">闪避</div><div class="cost">体力 20</div>
-            <div class="desc">100% 规避本回合伤害<br>闪避后轻击必暴击</div>
-          </div>
-          <div class="act" onclick="playerAct('riposte')" id="btn-riposte" style="display:none">
-            <div class="nm" style="color:#c792ea">处决</div><div class="cost">韧性已破</div>
-            <div class="desc">3.0× 无视防御<br>处决后敌人倒地 1 回合</div>
-          </div>
-          <div class="act" onclick="playerAct('potion')">
-            <div class="nm">药剂</div><div class="cost" id="pot-cost">限 2 次</div>
-            <div class="desc">恢复 30 HP · 消耗整回合</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>战斗统计 <span class="hint">白盒验证面板 · 当前战斗</span></h2>
-        <div class="stat-grid">
-          <div class="st"><div class="l">当前帧</div><div class="v" id="s-frame">0</div></div>
-          <div class="st"><div class="l">回合数</div><div class="v" id="s-turn">0</div></div>
-          <div class="st"><div class="l">每回合输出</div><div class="v" id="s-dps">-</div></div>
-          <div class="st"><div class="l">命中率</div><div class="v" id="s-hit">-</div></div>
-          <div class="st"><div class="l">暴击 / 处决</div><div class="v" id="s-crit">0 / 0</div></div>
-          <div class="st"><div class="l">累计击杀</div><div class="v" id="s-kill">0</div></div>
-        </div>
+    <div class="main">
+      <canvas id="cv" width="960" height="400"></canvas>
+      <div class="actions" id="actions">
+        <div class="act" data-k="light"><div class="nm">轻击</div><div class="cost">体力 25</div><div class="desc">1.0× · 削韧 10 · 快</div></div>
+        <div class="act" data-k="heavy"><div class="nm">重击</div><div class="cost">体力 40</div><div class="desc">1.8× · 削韧 25 · 慢</div></div>
+        <div class="act" data-k="guard"><div class="nm">格挡</div><div class="cost">回复 15 体力</div><div class="desc">减伤 70% · 荆棘反弹</div></div>
+        <div class="act" data-k="dodge"><div class="nm">闪避</div><div class="cost">体力 20</div><div class="desc">完全规避 · 反击必暴</div></div>
+        <div class="act" data-k="riposte" id="btn-riposte" style="display:none"><div class="nm" style="color:#c792ea">处决</div><div class="cost">韧性已破</div><div class="desc">3.0× 无视防御</div></div>
+        <div class="act" data-k="potion"><div class="nm">药剂</div><div class="cost" id="pot-cost">剩 2</div><div class="desc">恢复 30 HP</div></div>
       </div>
     </div>
 
-    <!-- ============ 右：Build 与数值 ============ -->
     <div class="side">
       <div class="panel">
         <h2>我的 Build <span class="hint">加点与遗物</span></h2>
-        <div class="build-line"><span>攻击力</span><b id="bl-atk">-</b></div>
-        <div class="build-line"><span>生命上限</span><b id="bl-hp">-</b></div>
-        <div class="build-line"><span>体力上限</span><b id="bl-st">-</b></div>
+        <div class="build-line"><span>攻击 / 生命 / 体力</span><b id="bl-stats">-</b></div>
         <div class="build-line"><span>药剂持有</span><b id="bl-pot">-</b></div>
         <div class="relic-tags" id="bl-relics"></div>
       </div>
-
+      <div class="panel">
+        <h2>战斗统计 <span class="hint">本场白盒验证</span></h2>
+        <div class="stat-grid">
+          <div class="st"><div class="l">回合</div><div class="v" id="s-turn">0</div></div>
+          <div class="st"><div class="l">每回合输出</div><div class="v" id="s-dps">-</div></div>
+          <div class="st"><div class="l">暴击/处决</div><div class="v" id="s-crit">0/0</div></div>
+          <div class="st"><div class="l">帧</div><div class="v" id="s-frame">0</div></div>
+          <div class="st"><div class="l">命中率</div><div class="v" id="s-hit">-</div></div>
+          <div class="st"><div class="l">累计击杀</div><div class="v" id="s-kill">0</div></div>
+        </div>
+      </div>
       <div class="panel">
         <h2>战斗日志 <span class="hint">帧级记录</span></h2>
         <div class="log" id="log"></div>
       </div>
-
       <div class="panel">
         <h2>伤害公式</h2>
-        <div class="formula">
-          最终伤害 = <code>ATK × 招式倍率 × 防御减免 × 暴击 × 浮动</code><br>
-          防御减免 = <code>1 − DEF/(DEF+100)</code>；浮动 <code>0.9~1.1</code><br>
-          暴击 = <code>1.5×</code>（轻击 15%，闪避反击 100%）<br>
-          格挡 = <code>×0.3</code>；护盾 = <code>×0.5</code>；蓄力目标 = <code>×1.5</code><br>
-          韧性破 → 处决 <code>3.0× 无视防御</code>
+        <div class="help" style="margin:0;font-size:10.5px;line-height:1.8">
+          伤害 = <span style="color:#c792ea">ATK×倍率×防御减免×暴击×浮动</span><br>
+          暴击 1.5×（闪避反击可 2.0×）· 格挡 ×0.3 · 护盾 ×0.5 · 蓄力目标受伤 +50%<br>
+          韧性破 → 处决 3.0× 无视防御
         </div>
       </div>
     </div>
   </div>
 
-  <div class="footer">试炼回廊 · 独立设计的肉鸽战斗系统 · 演示数值为自建平衡集 · github.com/46bzvs7m64-gif/combat-demo</div>
+  <div class="footer">试炼回廊 · 独立设计的肉鸽战斗游戏 · 角色与特效全部 Canvas 程序化绘制 · github.com/46bzvs7m64-gif/combat-demo</div>
 </div>
 
-<!-- 覆盖层：菜单 / 遗物 / 加点 / 结算 -->
 <div class="overlay" id="overlay"><div class="ov-panel" id="ov-panel"></div></div>
 
 <script>
 "use strict";
-// ==================== 配置：敌人模板 / 遗物池 / 升级价目 ====================
+/* ==================== 配置 ==================== */
 const ENEMIES = {
-  guard:     { name:"回廊守卫", hp:320, atk:20, def:30, poise:60, desc:"均衡型 · 半血狂暴（伤害×1.3 + 解锁连击）" },
-  berserker: { name:"血狂战士", hp:230, atk:27, def:15, poise:45, desc:"高攻低韧 · 血量低于 40% 进入嗜血（每回合双动）" },
-  sorcerer:  { name:"咒术师",   hp:260, atk:23, def:20, poise:70, shield:.22, desc:"护盾减伤 50% · 蓄力时受伤 +50%，下回合释放末日 2.2×" },
-  lord:      { name:"回廊之主", hp:540, atk:24, def:35, poise:95, desc:"三阶段 · 70% 狂暴 / 35% 末日循环，回廊的最深处" },
+  guard:     { name:"回廊守卫", hp:320, atk:20, def:30, poise:60, desc:"半血狂暴" },
+  berserker: { name:"血狂战士", hp:230, atk:27, def:15, poise:45, desc:"低血嗜血双动" },
+  sorcerer:  { name:"咒术师",   hp:260, atk:23, def:20, poise:70, shield:.22, desc:"护盾+蓄力" },
+  lord:      { name:"回廊之主", hp:540, atk:24, def:35, poise:95, desc:"三阶段" },
 };
 const FLOOR_PLAN = f =>
   f===1 ? ["guard"] :
@@ -207,302 +144,580 @@ const FLOOR_PLAN = f =>
   f===4 ? ["guard","berserker","sorcerer"] :
   f===5 ? ["lord"] :
   ["guard","berserker","sorcerer"];
-
 const RELICS = [
   { id:"eagle",  name:"鹰眼徽章", desc:"暴击率 +12%" },
-  { id:"razor",  name:"剃刀",     desc:"闪避反击的暴击倍率 1.5× → 2.0×" },
-  { id:"thorn",  name:"荆棘盾",   desc:"格挡时反弹 30% 减免前伤害" },
-  { id:"hammer", name:"碎甲锤",   desc:"削韧值 +50%，更快打出处决窗口" },
-  { id:"leech",  name:"吸血剑",   desc:"造成伤害的 12% 转化为生命（单次至多 8）" },
-  { id:"will",   name:"战意",     desc:"每回合体力自然回复 6 → 11" },
-  { id:"pouch",  name:"老兵药囊", desc:"药剂 +1，单次恢复量 30 → 40" },
-  { id:"hunter", name:"猎人直觉", desc:"处决伤害 3.0× → 4.0×" },
+  { id:"razor",  name:"剃刀",     desc:"闪避反击暴击倍率 2.0×" },
+  { id:"thorn",  name:"荆棘盾",   desc:"格挡反弹 30% 承受前伤害" },
+  { id:"hammer", name:"碎甲锤",   desc:"削韧 +50%" },
+  { id:"leech",  name:"吸血剑",   desc:"伤害 12% 转化生命（至多 8）" },
+  { id:"will",   name:"战意",     desc:"每回合体力回复 6 → 11" },
+  { id:"pouch",  name:"老兵药囊", desc:"药剂 +1，恢复 30 → 40" },
+  { id:"hunter", name:"猎人直觉", desc:"处决 3.0× → 4.0×" },
 ];
 const UP_INFO = {
-  atk: { label:"利刃 · 攻击 +4",   base:10, step:6,  eff:()=>playerAtkAdd(4) },
-  hp:  { label:"铁骨 · 生命 +20",  base:12, step:7,  eff:()=>playerHpAdd(20) },
-  st:  { label:"呼吸法 · 体力 +15",base:8,  step:5,  eff:()=>playerStAdd(15) },
-  pot: { label:"行囊 · 药剂 +1",   base:15, step:10, max:2,  eff:()=>{ meta.potions++; } },
+  atk: { label:"利刃 · 攻击 +4",    base:10, step:6 },
+  hp:  { label:"铁骨 · 生命 +20",   base:12, step:7 },
+  st:  { label:"呼吸法 · 体力 +15", base:8,  step:5 },
+  pot: { label:"行囊 · 药剂 +1",    base:15, step:10, max:2 },
 };
-const RUN_KEY = "corridor_save_v2";
-const FLOOR_SOULS = f => 8 + f*4;   // 第 f 层通关获得的魂
+const RUN_KEY = "corridor_save_v3";
+const FLOOR_SOULS = f => 8 + f*4;
 
-// ==================== 全局状态 ====================
-let meta = null;    // {floor, souls, up:{atk,hp,st,pot}, relics:[], potions, kills}
-let S = null;       // 当前战斗状态
-let E = null;       // 当前敌人实例
+/* ==================== 存档与全局 ==================== */
+let meta = null, S = null, E = null;
+const playerAtk  = () => 22 + (meta?meta.up.atk:0)*4;
+const playerMaxHp= () => 100 + (meta?meta.up.hp:0)*20;
+const playerMaxSt= () => 100 + (meta?meta.up.st:0)*15;
+const hasRelic = id => meta && meta.relics.includes(id);
+const defRed = d => 1 - d/(d+100);
+function saveGame(){ try{ localStorage.setItem(RUN_KEY, JSON.stringify(meta)); }catch(e){} }
+function loadGame(){ try{ return JSON.parse(localStorage.getItem(RUN_KEY)); }catch(e){ return null; } }
 
-const playerAtk = () => 22 + meta.up.atk*4;
-const playerMaxHp = () => 100 + meta.up.hp*20;
-const playerMaxSt = () => 100 + meta.up.st*15;
-const hasRelic = id => meta.relics.includes(id);
-const defRed = def => 1 - def/(def+100);
+/* ==================== 画面层 ==================== */
+const cv = document.getElementById("cv"), cx = cv.getContext("2d");
+const W = cv.width, H = cv.height;
+const P_BASE = { x:225, y:318 }, E_BASE = { x:735, y:318 };
+const V = {
+  p:{ ox:0, flash:0, ghost:0, block:0, visible:1 },
+  e:{ ox:0, flash:0, visible:1, aura:0, charge:0 },
+  slash:{ show:0, x:0, y:0, flip:1 },
+  proj:{ show:0, x:0, y:0, r:6 },
+  shake:0, t:0,
+};
+let particles = [], floaters = [];
+const Dp = { hp:100, st:100 }, De = { hp:1, poise:1, shd:0 }; // 平滑显示值
 
-// ==================== 存档 ====================
-function saveGame(){
-  try { localStorage.setItem(RUN_KEY, JSON.stringify(meta)); } catch(e){}
+function burst(x, y, n, color, speed, up){
+  for (let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, v = (0.4+Math.random()*0.6)*speed;
+    particles.push({ x, y, vx:Math.cos(a)*v, vy:Math.sin(a)*v - (up||0), life:1, dec:0.02+Math.random()*0.025, color, r:2+Math.random()*3 });
+  }
 }
-function loadGame(){
-  try { return JSON.parse(localStorage.getItem(RUN_KEY)); } catch(e){ return null; }
+function floatText(x, y, txt, color, size){
+  floaters.push({ x, y, txt, color, size:size||22, life:1 });
+}
+function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+
+/* ---- 背景 ---- */
+function drawBG(){
+  const g = cx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,"#0b0b15"); g.addColorStop(1,"#151528");
+  cx.fillStyle = g; cx.fillRect(0,0,W,H);
+  // 尽头拱门
+  cx.fillStyle = "#232348"; rr(W/2-70, 130, 140, 200, 60); cx.fill();
+  cx.fillStyle = "rgba(122,95,201,.25)"; rr(W/2-56, 142, 112, 190, 52); cx.fill();
+  // 地板透视
+  cx.fillStyle = "#131322"; cx.beginPath(); cx.moveTo(0,330); cx.lineTo(W,330); cx.lineTo(W,H); cx.lineTo(0,H); cx.fill();
+  cx.strokeStyle = "rgba(90,90,150,.18)"; cx.lineWidth = 1;
+  for (let i=-6;i<=6;i++){ cx.beginPath(); cx.moveTo(W/2+i*40,330); cx.lineTo(W/2+i*150,H); cx.stroke(); }
+  for (let y=330;y<H;y+=16){ cx.beginPath(); cx.moveTo(0,y); cx.lineTo(W,y); cx.stroke(); }
+  // 两侧柱与火把
+  [[105,1],[855,-1]].forEach(([tx,d])=>{
+    cx.fillStyle = "#20203a"; rr(tx-16,120,32,215,4); cx.fill();
+    cx.fillStyle = "#181830"; rr(tx-22,100,44,26,4); cx.fill();
+    const fy = 108 + Math.sin(V.t/90+tx)*2, fl = 10+Math.random()*5;
+    cx.fillStyle = "#5a4a2a"; rr(tx-3, fy, 6, 14, 2); cx.fill();
+    const fg = cx.createRadialGradient(tx, fy-4, 1, tx, fy-4, 22);
+    fg.addColorStop(0,"rgba(255,190,90,.9)"); fg.addColorStop(.5,"rgba(255,120,40,.35)"); fg.addColorStop(1,"rgba(255,120,40,0)");
+    cx.fillStyle = fg; cx.beginPath(); cx.arc(tx, fy-4, 22, 0, 7); cx.fill();
+    cx.fillStyle = "#ffd76e"; cx.beginPath();
+    cx.moveTo(tx, fy-6-fl); cx.quadraticCurveTo(tx+6, fy-2, tx, fy+2); cx.quadraticCurveTo(tx-6, fy-2, tx, fy-6-fl); cx.fill();
+  });
+  // 暗角
+  const vg = cx.createRadialGradient(W/2,H/2,220,W/2,H/2,620);
+  vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,.5)");
+  cx.fillStyle = vg; cx.fillRect(0,0,W,H);
 }
 
-// ==================== 远征流程 ====================
-function newRun(){
-  meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0 };
-  saveGame();
-  startFloor();
+/* ---- 角色（全程序化） ---- */
+function shadow(x,y,w){ cx.fillStyle="rgba(0,0,0,.45)"; cx.beginPath(); cx.ellipse(x,y+4,w,7,0,0,7); cx.fill(); }
+function drawPlayer(x,y){
+  const b = Math.sin(V.t/480)*2.5;
+  y += b;
+  const gx = x - V.p.ghost*70;
+  if (V.p.ghost > 0.02){ cx.globalAlpha = V.p.ghost*0.5; drawPlayerBody(gx,y); cx.globalAlpha = 1; }
+  drawPlayerBody(x,y);
+  if (V.p.block > 0.02){
+    cx.strokeStyle = `rgba(127,216,160,${V.p.block})`; cx.lineWidth = 4;
+    cx.beginPath(); cx.arc(x+16, y-58, 34, -1.1, 1.1); cx.stroke();
+  }
 }
-function continueRun(){
-  const m = loadGame();
-  if (m && m.floor){ meta = m; startFloor(); } else newRun();
+function drawPlayerBody(x,y){
+  const f = V.p.flash;
+  // 披风
+  cx.fillStyle = f>0.05?`rgba(${200+f*55|0},${60+f*100|0},${70+f*100|0},1)`:"#27314f";
+  cx.beginPath(); cx.moveTo(x-4,y-92); cx.quadraticCurveTo(x-30,y-60,x-20+Math.sin(V.t/300)*4,y-8);
+  cx.lineTo(x-2,y-14); cx.quadraticCurveTo(x-8,y-60,x+4,y-90); cx.fill();
+  // 腿
+  cx.strokeStyle = "#2c3550"; cx.lineWidth = 7; cx.lineCap = "round";
+  cx.beginPath(); cx.moveTo(x-6,y-36); cx.lineTo(x-10,y-2); cx.moveTo(x+8,y-36); cx.lineTo(x+12,y-2); cx.stroke();
+  // 躯干
+  cx.fillStyle = f>0.05?"#fff":"#3b4a75"; rr(x-13,y-78,26,44,9); cx.fill();
+  cx.fillStyle = "#2c3550"; rr(x-13,y-56,26,8,3); cx.fill();
+  // 头+兜帽
+  cx.fillStyle = f>0.05?"#fff":"#46588c"; cx.beginPath(); cx.arc(x,y-88,12,0,7); cx.fill();
+  cx.fillStyle = "#1c2338"; cx.beginPath(); cx.arc(x,y-90,12.5,Math.PI*0.9,Math.PI*2.1); cx.fill();
+  cx.fillStyle = "#7fd8ff"; cx.fillRect(x+2,y-90,5,3);
+  // 剑
+  cx.save(); cx.translate(x+14,y-52); cx.rotate(-0.5+Math.sin(V.t/480)*0.06);
+  cx.fillStyle = "#c8d2e8"; cx.fillRect(-2,-58,4,58);
+  cx.fillStyle = "#8a93ad"; cx.fillRect(-8,-4,16,4); cx.fillRect(-2,0,4,10);
+  cx.restore();
+  cx.fillStyle = f>0.05?`rgba(255,${180+f*75|0},${180+f*75|0},1)`:"#7fd8a0";
+  cx.beginPath(); cx.arc(x+14,y-44,3.5,0,7); cx.fill();
 }
+function drawEnemy(x,y){
+  if (V.e.aura > 0.02){
+    const ag = cx.createRadialGradient(x,y-70,10,x,y-70,110);
+    ag.addColorStop(0,`rgba(255,70,70,${0.35*V.e.aura})`); ag.addColorStop(1,"rgba(255,70,70,0)");
+    cx.fillStyle = ag; cx.beginPath(); cx.arc(x,y-70,110,0,7); cx.fill();
+  }
+  const sc = E.type==="lord"?1.32 : E.type==="guard"?1.08 : 1;
+  cx.save(); cx.translate(x,y); cx.scale(sc,sc); cx.translate(-x,-y);
+  const f = V.e.flash, b = Math.sin(V.t/420 + 2)*2.5;
+  y += b;
+  if (E.type==="guard") drawGuard(x,y,f);
+  else if (E.type==="berserker") drawBerserker(x,y,f);
+  else if (E.type==="sorcerer") drawSorcerer(x,y,f);
+  else drawLord(x,y,f);
+  cx.restore();
+  if (V.e.charge > 0.03){
+    const oy = y-120, r = 6+V.e.charge*16;
+    const og = cx.createRadialGradient(x,oy,1,x,oy,r+8);
+    og.addColorStop(0,"rgba(200,140,255,.95)"); og.addColorStop(1,"rgba(140,80,255,0)");
+    cx.fillStyle = og; cx.beginPath(); cx.arc(x,oy,r+8,0,7); cx.fill();
+  }
+}
+function eLimbs(x,y,f,c1,c2){ // 通用腿
+  cx.strokeStyle = c2; cx.lineWidth = 8; cx.lineCap = "round";
+  cx.beginPath(); cx.moveTo(x-8,y-34); cx.lineTo(x-12,y-2); cx.moveTo(x+8,y-34); cx.lineTo(x+12,y-2); cx.stroke();
+}
+function drawGuard(x,y,f){
+  eLimbs(x,y,f,"","#3a4152");
+  cx.fillStyle = f>0.05?"#fff":"#545e78"; rr(x-18,y-84,36,50,10); cx.fill();
+  cx.fillStyle = "#3a4152"; rr(x-18,y-62,36,9,3); cx.fill();
+  cx.fillStyle = f>0.05?"#fff":"#626d8c"; cx.beginPath(); cx.arc(x,y-94,13,0,7); cx.fill();
+  cx.fillStyle = "#181c28"; cx.fillRect(x-9,y-97,18,4);
+  cx.fillStyle = "#ff9c5a"; cx.fillRect(x-6,y-96,4,2); cx.fillRect(x+3,y-96,4,2);
+  // 大剑拄地
+  cx.save(); cx.translate(x+24,y-46); cx.rotate(0.28);
+  cx.fillStyle = "#aeb8d0"; cx.fillRect(-3,-74,6,74);
+  cx.fillStyle = "#6c7690"; cx.fillRect(-11,-6,22,5); cx.fillRect(-3,-1,6,14);
+  cx.restore();
+  // 肩甲
+  cx.fillStyle = "#6c7690"; cx.beginPath(); cx.arc(x-17,y-80,9,0,7); cx.arc(x+17,y-80,9,0,7); cx.fill();
+}
+function drawBerserker(x,y,f){
+  eLimbs(x,y,f,"","#4a2626");
+  cx.fillStyle = f>0.05?"#fff":"#7a3030"; rr(x-15,y-80,30,46,10); cx.fill();
+  cx.fillStyle = "#5a2222"; cx.beginPath(); cx.moveTo(x-15,y-80); cx.lineTo(x,y-96); cx.lineTo(x+15,y-80); cx.fill();
+  cx.fillStyle = f>0.05?"#fff":"#8a3a3a"; cx.beginPath(); cx.arc(x,y-92,12,0,7); cx.fill();
+  cx.fillStyle = "#ffe08a"; cx.fillRect(x-7,y-94,4,3); cx.fillRect(x+3,y-94,4,3);
+  cx.strokeStyle = "#c8d2e8"; cx.lineWidth = 4;
+  [[-1,-1],[1,1]].forEach(([sx,rot])=>{
+    cx.save(); cx.translate(x+sx*20,y-52); cx.rotate(rot*0.5);
+    cx.beginPath(); cx.moveTo(0,0); cx.lineTo(0,-34); cx.stroke();
+    cx.fillStyle = "#b8c2da"; cx.beginPath(); cx.moveTo(0,-34); cx.quadraticCurveTo(sx*20,-30,sx*16,-14); cx.quadraticCurveTo(sx*8,-22,0,-22); cx.fill();
+    cx.restore();
+  });
+}
+function drawSorcerer(x,y,f){
+  cx.fillStyle = f>0.05?"#fff":"#3d2a5e";
+  cx.beginPath(); cx.moveTo(x,y-108); cx.lineTo(x+24,y-2); cx.lineTo(x-24,y-2); cx.closePath(); cx.fill();
+  cx.fillStyle = "#2a1c42"; cx.beginPath(); cx.moveTo(x,y-108); cx.lineTo(x+13,y-72); cx.lineTo(x-13,y-72); cx.fill();
+  cx.fillStyle = "#b3a1e8"; cx.fillRect(x-6,y-92,4,2.5); cx.fillRect(x+2,y-92,4,2.5);
+  cx.save(); cx.translate(x-24,y-40); cx.rotate(0.15);
+  cx.strokeStyle = "#5a4a2a"; cx.lineWidth = 4; cx.beginPath(); cx.moveTo(0,10); cx.lineTo(0,-64); cx.stroke();
+  cx.fillStyle = "#c792ea"; cx.beginPath(); cx.arc(0,-70,6+Math.sin(V.t/200)*1.5,0,7); cx.fill();
+  cx.restore();
+}
+function drawLord(x,y,f){
+  // 披风
+  cx.fillStyle = "#3a1030";
+  cx.beginPath(); cx.moveTo(x-6,y-96); cx.quadraticCurveTo(x-42,y-64,x-30,y-4); cx.lineTo(x-4,y-12); cx.quadraticCurveTo(x-14,y-64,x+4,y-94); cx.fill();
+  eLimbs(x,y,f,"","#2c2438");
+  cx.fillStyle = f>0.05?"#fff":"#463a5e"; rr(x-19,y-86,38,52,11); cx.fill();
+  cx.fillStyle = "#c792ea"; rr(x-19,y-58,38,7,3); cx.fill();
+  cx.fillStyle = f>0.05?"#fff":"#544674"; cx.beginPath(); cx.arc(x,y-98,14,0,7); cx.fill();
+  cx.fillStyle = "#181420"; cx.fillRect(x-10,y-102,20,5);
+  cx.fillStyle = "#ff5a7a"; cx.fillRect(x-7,y-101,5,3); cx.fillRect(x+3,y-101,5,3);
+  // 王冠
+  cx.fillStyle = "#ffd76e";
+  cx.beginPath(); cx.moveTo(x-12,y-108); cx.lineTo(x-12,y-118); cx.lineTo(x-6,y-111); cx.lineTo(x,y-121); cx.lineTo(x+6,y-111); cx.lineTo(x+12,y-118); cx.lineTo(x+12,y-108); cx.closePath(); cx.fill();
+  // 巨剑
+  cx.save(); cx.translate(x+27,y-48); cx.rotate(0.22);
+  cx.fillStyle = "#d8e0f0"; cx.fillRect(-4,-92,8,92);
+  cx.fillStyle = "#8a7aa8"; cx.fillRect(-14,-8,28,6); cx.fillRect(-4,-2,8,16);
+  cx.restore();
+  cx.fillStyle = f>0.05?"#fff":"#6c5a94"; cx.beginPath(); cx.arc(x-19,y-82,10,0,7); cx.arc(x+19,y-82,10,0,7); cx.fill();
+}
+
+/* ---- 头顶血条 ---- */
+function drawBar(x, y, w, ratio, color, label){
+  cx.fillStyle = "rgba(10,10,22,.75)"; rr(x-w/2-2, y-2, w+4, 12, 5); cx.fill();
+  cx.fillStyle = "#2a2a44"; rr(x-w/2, y, w, 8, 4); cx.fill();
+  cx.fillStyle = color; rr(x-w/2, y, Math.max(0,w*Math.min(1,ratio)), 8, 4); cx.fill();
+  cx.fillStyle = "#e8e8f0"; cx.font = "9px Microsoft YaHei"; cx.textAlign = "center";
+  cx.fillText(label, x, y-5);
+}
+function drawHUD(){
+  if (!S || !E) return;
+  const px = P_BASE.x + V.p.ox, ex = E_BASE.x + V.e.ox;
+  drawBar(px, 158, 150, Dp.hp/playerMaxHp(), "#e04a4a", `玩家 ${Math.ceil(Dp.hp)}/${playerMaxHp()}`);
+  drawBar(px, 176, 150, Dp.st/playerMaxSt(), "#3f9e5f", `体力 ${Math.floor(Dp.st)}`);
+  drawBar(ex, 128, 165, De.hp/E.maxhp, "#e04a4a", `${E.name}  ${Math.ceil(De.hp)}/${E.maxhp}`);
+  drawBar(ex, 146, 165, De.poise/E.maxpoise, "#d9a441", `韧性 ${Math.ceil(De.poise)}${E.poise===0?"  → 可处决":""}`);
+  if (E.maxshield) drawBar(ex, 164, 165, De.shd/E.maxshield, "#7a5fc9", `护盾 ${Math.ceil(De.shd)}`);
+  cx.font = "bold 10px Microsoft YaHei";
+  cx.fillStyle = E.phase===1 ? "#a8b3ff" : "#ff9c9c";
+  cx.fillText(E.phase===1 ? (E.type==="lord"?"第 1 阶段":E.desc) : (E.phase===3?"最终阶段":"阶段 2 · 狂暴"), ex, 108);
+}
+
+/* ---- 主渲染循环 ---- */
+let lastT = 0;
+function loop(ts){
+  const dt = Math.min(50, ts - lastT || 16); lastT = ts; V.t += dt;
+  tickQueue(dt);
+  cx.clearRect(0,0,W,H);
+  cx.save();
+  if (V.shake > 0.5){ cx.translate((Math.random()-0.5)*V.shake, (Math.random()-0.5)*V.shake); V.shake *= Math.pow(0.9, dt/16); } else V.shake = 0;
+  V.p.flash = Math.max(0, V.p.flash - dt*0.004);
+  V.e.flash = Math.max(0, V.e.flash - dt*0.004);
+  if (S && S.p && !S.p.guard) V.p.block = Math.max(0, V.p.block - dt*0.005);
+  drawBG();
+  if (S && E){
+    const px = P_BASE.x + V.p.ox, ex = E_BASE.x + V.e.ox;
+    shadow(px, P_BASE.y, 26); shadow(ex, E_BASE.y, 30);
+    // 弹射物
+    if (V.proj.show > 0){
+      const pg = cx.createRadialGradient(V.proj.x,V.proj.y,1,V.proj.x,V.proj.y,V.proj.r+6);
+      pg.addColorStop(0,"rgba(220,150,255,.95)"); pg.addColorStop(1,"rgba(140,80,255,0)");
+      cx.fillStyle = pg; cx.beginPath(); cx.arc(V.proj.x,V.proj.y,V.proj.r+6,0,7); cx.fill();
+    }
+    drawEnemy(ex, E_BASE.y);
+    drawPlayer(px, P_BASE.y);
+    // 斩击弧
+    if (V.slash.show > 0.02){
+      const s = V.slash;
+      cx.strokeStyle = `rgba(255,255,255,${s.show})`; cx.lineWidth = 5; cx.lineCap = "round";
+      cx.beginPath(); cx.arc(s.x, s.y, 46, s.flip>0 ? -1.4 : Math.PI-1.6, s.flip>0 ? 1.0 : Math.PI+0.8); cx.stroke();
+      cx.strokeStyle = `rgba(255,220,140,${s.show*0.7})`; cx.lineWidth = 2;
+      cx.beginPath(); cx.arc(s.x, s.y, 38, s.flip>0 ? -1.2 : Math.PI-1.4, s.flip>0 ? 0.8 : Math.PI+0.6); cx.stroke();
+    }
+    drawHUD();
+  }
+  // 粒子
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => { p.x+=p.vx*dt/16; p.y+=p.vy*dt/16; p.vy+=0.12*dt/16; p.life-=p.dec*dt/16;
+    cx.globalAlpha = Math.max(0,p.life); cx.fillStyle = p.color;
+    cx.beginPath(); cx.arc(p.x,p.y,p.r,0,7); cx.fill(); cx.globalAlpha = 1; });
+  // 浮动数字
+  floaters = floaters.filter(f => f.life > 0);
+  floaters.forEach(f => { f.y -= 0.05*dt; f.life -= 0.0016*dt;
+    cx.globalAlpha = Math.max(0,Math.min(1,f.life*1.5)); cx.fillStyle = f.color;
+    cx.font = `bold ${f.size}px Microsoft YaHei`; cx.textAlign = "center";
+    cx.fillText(f.txt, f.x, f.y); cx.globalAlpha = 1; });
+  cx.restore();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ==================== 动画事件队列 ==================== */
+let queue = [], qActive = null, onQueueEmpty = null, inputLocked = false;
+function runSeq(events, done){
+  queue = events.slice(); onQueueEmpty = done || null; inputLocked = true; nextEvent();
+}
+function nextEvent(){
+  if (!queue.length){
+    inputLocked = false;
+    const f = onQueueEmpty; onQueueEmpty = null;
+    renderUI();
+    if (f) f();
+    return;
+  }
+  qActive = queue.shift(); qActive.t = 0;
+  if (qActive.start) qActive.start();
+}
+function tickQueue(dt){
+  if (!qActive) return;
+  qActive.t += dt;
+  const p = Math.min(1, qActive.t / qActive.dur);
+  if (qActive.update) qActive.update(p);
+  if (qActive.t >= qActive.dur){
+    if (qActive.end) qActive.end();
+    qActive = null; nextEvent();
+  }
+}
+const skip = () => S.over;
+
+/* ==================== 战斗流程 ==================== */
 function startFloor(){
   hideOverlay();
   const pool = FLOOR_PLAN(meta.floor);
-  const key = pool[Math.floor(Math.random()*pool.length)];
-  spawnEnemy(key);
-  S = {
-    frame:0, turn:0, over:false, log:[],
-    p:{ hp:playerMaxHp(), st:playerMaxSt(), guard:false, dodgeBuff:false },
-    stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 },
-  };
+  spawnEnemy(pool[Math.floor(Math.random()*pool.length)]);
+  S = { frame:0, turn:0, over:false, log:[],
+        p:{ hp:playerMaxHp(), st:playerMaxSt(), guard:false, dodgeBuff:false },
+        stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
+  Dp.hp = S.p.hp; Dp.st = S.p.st; De.hp = E.hp; De.poise = E.poise; De.shd = E.shield;
+  V.p = { ox:0, flash:0, ghost:0, block:0, visible:1 };
+  V.e = { ox:0, flash:0, visible:1, aura:0, charge:0 };
+  particles = []; floaters = [];
   document.getElementById("log").innerHTML = "";
   sysLog(`—— 第 ${meta.floor} 层 · ${E.name} 挡在回廊深处 ——`);
-  render();
+  renderUI();
 }
-
 function spawnEnemy(key){
-  const t = ENEMIES[key];
-  const f = meta.floor;
-  const scaleHp = 1 + .25*(Math.min(f,5)-1) + Math.max(0,f-5)*.08;
-  const scaleAtk = 1 + .13*(Math.min(f,5)-1) + Math.max(0,f-5)*.06;
-  E = {
-    type:key, name:t.name, desc:t.desc,
-    maxhp: Math.round(t.hp*scaleHp), hp:0,
-    atk: +(t.atk*scaleAtk).toFixed(1),
-    def: t.def, maxpoise: Math.round(t.poise*(1+.08*(Math.min(f,5)-1))), poise:0,
-    phase:1, stunned:0, shield:0, maxshield: t.shield?Math.round(t.hp*scaleHp*t.shield):0,
-    chargeNext:false, lastRage:false,
-  };
+  const t = ENEMIES[key], f = meta.floor;
+  const sHp = 1 + .25*(Math.min(f,5)-1) + Math.max(0,f-5)*.08;
+  const sAtk = 1 + .13*(Math.min(f,5)-1) + Math.max(0,f-5)*.06;
+  E = { type:key, name:t.name, desc:t.desc,
+    maxhp:Math.round(t.hp*sHp), atk:+(t.atk*sAtk).toFixed(1), def:t.def,
+    maxpoise:Math.round(t.poise*(1+.08*(Math.min(f,5)-1))),
+    phase:1, stunned:0, shield:0, maxshield:t.shield?Math.round(t.hp*sHp*t.shield):0,
+    chargeNext:false };
   E.hp = E.maxhp; E.poise = E.maxpoise;
   if (E.maxshield) E.shield = E.maxshield;
 }
+const playerDmg = (mult, targetDef, crit, critMult) =>
+  Math.max(1, Math.round(playerAtk()*mult*defRed(targetDef)*(crit?critMult:1)*(0.9+Math.random()*0.2)));
+const enemyDmg = mult => Math.max(1, Math.round(E.atk*mult*(0.9+Math.random()*0.2)));
 
-// ==================== 伤害计算 ====================
-function playerDmg(mult, targetDef, crit){
-  const float = .9 + Math.random()*.2;
-  return Math.max(1, Math.round(playerAtk() * mult * defRed(targetDef) * (crit?1.5:1) * float));
-}
-function enemyDmg(mult, crit){
-  const float = .9 + Math.random()*.2;
-  return Math.max(1, Math.round(E.atk * mult * (crit?1.5:1) * float));
-}
+/* ---- 玩家行动 ---- */
+document.querySelectorAll("#actions .act").forEach(el => {
+  el.addEventListener("click", () => playerAct(el.dataset.k));
+});
+function lockUI(){ document.querySelectorAll("#actions .act").forEach(el => el.classList.add("lock")); }
+function unlockUI(){ document.querySelectorAll("#actions .act").forEach(el => el.classList.remove("lock")); }
 
-// ==================== 玩家行动 ====================
 function playerAct(kind){
-  if (!S || S.over) return;
+  if (!S || S.over || inputLocked) return;
   const p = S.p;
+  if (kind === "riposte" && E.poise > 0) return;
+  if (kind === "potion" && meta.potions <= 0) return;
+  lockUI();
   S.turn++; S.frame += 2;
-  const regen = hasRelic("will") ? 11 : 6;
-  p.st = Math.min(playerMaxSt(), p.st + regen);
+  p.st = Math.min(playerMaxSt(), p.st + (hasRelic("will")?11:6));
   p.guard = false;
-  let h = `<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> `;
+  const h = `<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> `;
 
-  // —— 处决 ——
-  if (kind === "riposte"){
-    if (E.poise > 0) return;
-    const mult = hasRelic("hunter") ? 4.0 : 3.0;
-    const d = Math.round(playerAtk() * mult * 1.5);   // 无视防御，必暴击
-    dealToEnemy(d, true, h, `发动 <span class="exec">处决</span>`);
-    S.stats.execs++;
-    if (S.over) return;
-    E.stunned = 1; E.poise = E.maxpoise;
-    sysLog("敌人被处决后倒地 1 回合，韧性已重置");
-    enemyTurn(); afterRound(); return;
-  }
-
-  // —— 药剂 ——
-  if (kind === "potion"){
-    if (meta.potions <= 0) return;
-    meta.potions--;
-    const heal = hasRelic("pouch") ? 40 : 30;
-    p.hp = Math.min(playerMaxHp(), p.hp + heal); S.frame += 2;
-    addLog(`${h}玩家使用药剂 <span class="heal">+${heal} HP</span>（剩余 ${meta.potions}）`);
-    enemyTurn(); afterRound(); return;
-  }
-
-  // —— 格挡 ——
   if (kind === "guard"){
-    p.guard = true; p.st = Math.min(playerMaxSt(), p.st + 15); S.frame += 2;
-    addLog(`${h}玩家 <b>格挡</b>，体力 <span class="heal">+15</span>，本回合减伤 70%${hasRelic("thorn")?" · 荆棘待发":""}`);
-    enemyTurn(); afterRound(); return;
+    p.guard = true; p.st = Math.min(playerMaxSt(), p.st+15);
+    addLog(`${h}玩家 <b>格挡</b>，体力 <span class="heal">+15</span>，减伤 70%${hasRelic("thorn")?" · 荆棘待发":""}`);
+    runSeq([{ dur:260, update:t=>{ V.p.block = t; }, end:()=>{ V.p.block = 0.9; } }], () => enemyPhase());
+    return;
   }
-
-  // —— 闪避 ——
   if (kind === "dodge"){
-    if (p.st < 20){ sysLog("体力不足，无法闪避"); S.turn--; render(); return; }
-    p.st -= 20; p.dodgeBuff = true; S.frame += 2;
-    addLog(`${h}玩家 <b>闪避</b>，完全规避本回合伤害，下次轻击必暴击`);
-    enemyTurn(); afterRound(); return;
+    if (p.st < 20){ sysLog("体力不足，无法闪避"); S.turn--; renderUI(); return; }
+    p.st -= 20; p.dodgeBuff = true;
+    addLog(`${h}玩家 <b>闪避</b>，规避本回合伤害，下次轻击必暴击`);
+    runSeq([
+      { dur:200, update:t=>{ V.p.ghost = t; V.p.ox = -46*t; } },
+      { dur:260, update:t=>{ V.p.ghost = 1-t; V.p.ox = -46*(1-t); } },
+    ], () => enemyPhase());
+    return;
   }
-
-  // —— 攻击 ——
+  if (kind === "potion"){
+    meta.potions--;
+    const heal = hasRelic("pouch")?40:30;
+    p.hp = Math.min(playerMaxHp(), p.hp+heal);
+    addLog(`${h}玩家使用药剂 <span class="heal">+${heal} HP</span>（剩 ${meta.potions}）`);
+    runSeq([{ dur:420, start:()=>{ burst(P_BASE.x, P_BASE.y-70, 14, "#7fd8a0", 1.6, 1.4);
+               floatText(P_BASE.x, P_BASE.y-130, `+${heal}`, "#7fd8a0", 20); } }], () => enemyPhase());
+    return;
+  }
+  if (kind === "riposte"){
+    const mult = hasRelic("hunter")?4.0:3.0;
+    const d = Math.round(playerAtk()*mult*1.5);
+    runSeq([
+      { dur:300, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-70)*t; } },
+      { dur:160, start:()=>{
+          S.frame += 4; S.stats.execs++;
+          applyToEnemy(d, true, "处决", true);
+          burst(E_BASE.x-20, E_BASE.y-70, 26, "#c792ea", 3.2, 1.2);
+          floatText(E_BASE.x-10, E_BASE.y-150, `${d}!`, "#c792ea", 30);
+          V.shake = 14; V.slash = { show:1, x:E_BASE.x-30, y:E_BASE.y-70, flip:1 };
+        }, update:t=>{ V.slash.show = 1-t; } },
+      { dur:300, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-70)*(1-t); V.slash.show = 0; } },
+    ], () => afterPlayerAttack(true));
+    return;
+  }
+  // 攻击
   const mv = kind === "light"
-    ? { name:"轻击", cost:25, startup:2, recovery:1, mult:1.0, poiseDmg: hasRelic("hammer")?15:10, critBase:.15 }
-    : { name:"重击", cost:40, startup:4, recovery:3, mult:1.8, poiseDmg: hasRelic("hammer")?38:25, critBase:.15 };
-  if (p.st < mv.cost){ sysLog(`体力不足（需 ${mv.cost}，当前 ${Math.floor(p.st)}）`); S.turn--; render(); return; }
+    ? { name:"轻击", cost:25, startup:2, recovery:1, mult:1.0, poiseDmg:hasRelic("hammer")?15:10, critBase:.15 }
+    : { name:"重击", cost:40, startup:4, recovery:3, mult:1.8, poiseDmg:hasRelic("hammer")?38:25, critBase:.15 };
+  if (p.st < mv.cost){ sysLog(`体力不足（需 ${mv.cost}，当前 ${Math.floor(p.st)}）`); S.turn--; renderUI(); return; }
   p.st -= mv.cost;
   S.frame += mv.startup;
   const crit = (p.dodgeBuff && kind==="light") || Math.random() < mv.critBase + (hasRelic("eagle")?.12:0);
-  let d = playerDmg(mv.mult, E.def, crit);
-  if (E.shield > 0) d = Math.round(d * .5);
-  if (E.chargeNext) d = Math.round(d * 1.5);
-  S.frame += mv.recovery;
-  p.dodgeBuff = false;
-
-  // 护盾先吃伤害
-  let shieldTxt = "";
+  const critMult = (p.dodgeBuff && kind==="light" && hasRelic("razor")) ? 2.0 : 1.5;
+  const d0 = playerDmg(mv.mult, E.def, crit, critMult);
+  let d = d0, shTxt = "";
   if (E.shield > 0){
-    const absorbed = Math.min(E.shield, d);
-    E.shield -= absorbed; d -= absorbed;
-    shieldTxt = `（护盾吸收 ${absorbed}）`;
-    if (E.shield === 0 && E.maxshield){
-      E.poise = Math.max(0, E.poise - 20);
-      sysLog("护盾碎裂！削韧 +20");
-    }
+    const abs = Math.min(E.shield, Math.round(d*0.5));
+    shTxt = `（护盾吸收 ${abs}）`; d = d - Math.round(d*0.5);
   }
-  S.stats.swings++; S.stats.hits++; S.stats.dmg += d;
+  if (E.chargeNext){ d = Math.round(d*1.5); shTxt += " 蓄力目标受伤+50%"; }
+  S.stats.swings++; S.stats.hits++;
   if (crit) S.stats.crits++;
-  E.hp = Math.max(0, E.hp - d);
-  E.poise = Math.max(0, E.poise - mv.poiseDmg);
-  addLog(`${h}玩家 <b>${mv.name}</b>（前摇${mv.startup}→命中→后摇${mv.recovery}）→ ${crit?`<span class="crit">暴击 ${d}</span>`:`<span class="dmg">${d}</span> 伤害`} · 削韧 ${mv.poiseDmg}${shieldTxt}`);
-
-  if (hasRelic("leech") && d > 0){
-    const heal = Math.min(8, Math.round(d*.12));
-    p.hp = Math.min(playerMaxHp(), p.hp + heal);
-    addLog(`吸血剑 <span class="heal">+${heal} HP</span>`);
-  }
-  if (E.poise === 0) sysLog("⚠ 敌人韧性破！出现处决窗口");
-
-  if (checkEnemyDead()) return;
-  enemyTurn();
-  afterRound();
+  const reach = kind==="light" ? 90 : 120;
+  runSeq([
+    { dur:120+mv.startup*70, update:t=>{ V.p.ox = reach*t*t; } },
+    { dur:150, start:()=>{
+        S.frame += mv.recovery;
+        applyToEnemy(d, crit, mv.name, false);
+        E.shield = Math.max(0, E.shield - Math.min(E.shield, d0-d));
+        if (E.maxshield && E.shield===0){ E.poise = Math.max(0,E.poise-20); sysLog("护盾碎裂！削韧 +20"); }
+        E.poise = Math.max(0, E.poise - mv.poiseDmg);
+        S.stats.dmg += d;
+        p.dodgeBuff = false;
+        if (hasRelic("leech") && d>0){ const hl = Math.min(8, Math.round(d*.12));
+          p.hp = Math.min(playerMaxHp(), p.hp+hl);
+          addLog(`吸血剑 <span class="heal">+${hl} HP</span>`); }
+        if (E.poise === 0) sysLog("⚠ 敌人韧性破！出现处决窗口");
+        V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-70, flip:1 };
+        V.e.flash = 1; V.shake = kind==="heavy"?9:5;
+        burst(E_BASE.x+V.e.ox-30, E_BASE.y-70, crit?18:10, crit?"#ffd76e":"#ff8a8a", 2.2, 0.8);
+        floatText(E_BASE.x+V.e.ox-20, E_BASE.y-150, `${d}`, crit?"#ffd76e":"#ff8a8a", crit?27:21);
+        addLog(`${h}玩家 <b>${mv.name}</b> → ${crit?`<span class="crit">暴击 ${d}</span>`:`<span class="dmg">${d}</span>`} · 削韧 ${mv.poiseDmg}${shTxt}`);
+      }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); } },
+    { dur:140+mv.recovery*60, update:t=>{ V.p.ox = reach*(1-t); } },
+  ], () => afterPlayerAttack(false));
 }
-
-function dealToEnemy(d, crit, h, label){
+function afterPlayerAttack(riposted){
+  if (S.over){ return; }
+  if (E.hp <= 0){ killEnemy(); return; }
+  enemyPhase();
+}
+function applyToEnemy(d, crit, label, ignoreDef){
   E.hp = Math.max(0, E.hp - d);
   S.stats.dmg += d;
-  addLog(`${h}玩家 ${label} → ${crit?`<span class="crit">${d}</span>`:`<span class="dmg">${d}</span> 伤害`}`);
-  checkEnemyDead();
 }
 
-// ==================== 敌人行动（按类型分派行为树） ====================
-function enemyTurn(){
+/* ---- 敌人回合（AI 决策 + 动画顺序执行） ---- */
+function enemyPhase(){
+  if (S.over) return;
+  const evs = [];
+  if (E.stunned > 0){
+    E.stunned--; sysLog("敌人倒地中，跳过行动");
+    runSeq([{ dur:300, update:()=>{} }], () => endRound());
+    return;
+  }
+  S.frame += 3;
+  // 阶段切换检测
+  const phaseTo = (to, msg) => { if (E.phase < to){ E.phase = to; evs.push({ phaseMsg:msg }); } };
+  if (E.type === "guard")     phaseTo(2, "⚠ 回廊守卫进入狂暴：伤害 ×1.3，解锁连击");
+  if (E.type === "berserker") if (E.phase===1 && E.hp <= E.maxhp*.4) phaseTo(2, "⚠ 血狂战士进入嗜血：每回合双动！");
+  if (E.type === "lord"){
+    if (E.phase===1 && E.hp <= E.maxhp*.7) phaseTo(2, "⚠ 回廊之主 · 第二阶段：狂暴 ×1.25");
+    if (E.phase===2 && E.hp <= E.maxhp*.35) phaseTo(3, "⚠ 回廊之主 · 最终阶段：末日循环");
+  }
+  const rage = E.type==="lord" ? (E.phase>=2?1.25:1) : (E.type==="guard"&&E.phase===2 ? 1.3 : 1);
+  const tag = () => `<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> `;
+
+  const atk = (mult, name, ranged) => {
+    evs.push({ atk:true, mult:mult*rage, name, ranged });
+  };
+  const r = Math.random();
+  if (E.type === "guard"){
+    if (r < .5) atk(.8, "横扫");
+    else if (r < .85) atk(1.3, "重劈");
+    else { atk(1.0, "突刺"); if (E.phase===2) atk(.7, "连击·第二段"); }
+  } else if (E.type === "berserker"){
+    atk(r < .5 ? 1.0 : 1.35, r < .5 ? "挥砍" : "致命跳劈");
+    if (E.phase === 2) atk(.8, "嗜血追击");
+  } else if (E.type === "sorcerer"){
+    if (E.chargeNext){ evs.push({ proj:true, mult:2.2, name:"末日咒术" }); E.chargeNext = false;
+      if (E.maxshield && E.shield===0) evs.push({ reshield:.5 }); }
+    else if (r < .28){ E.chargeNext = true; evs.push({ charge:true, msg:"开始<b>蓄力</b>（受伤 +50%，下回合末日 2.2×）" }); }
+    else if (r < .5 && E.shield < E.maxshield){ evs.push({ reshield:.35 }); }
+    else atk(1.0, "暗影弹", true);
+  } else { // lord
+    if (E.phase===3 && S.turn % 3 === 0 && !E.chargeNext){ E.chargeNext = true;
+      evs.push({ charge:true, msg:"聚集回廊之力（受伤 +50%，下回合末日 2.4×）" }); }
+    else if (E.chargeNext){ evs.push({ proj:true, mult:2.4, name:"回廊末日" }); E.chargeNext = false; }
+    else if (r < .4) atk(1.0, "王权横扫");
+    else if (r < .7) atk(1.3, "崩山重劈");
+    else { atk(.8, "双连击"); atk(.8, "双连击·二段"); }
+  }
+  runSeq(evs.map(e => {
+    if (e.phaseMsg !== undefined) return { dur:600, start:()=>{
+        sysLog(e.phaseMsg); V.e.aura = 1; V.shake = 8;
+        burst(E_BASE.x, E_BASE.y-80, 24, "#ff6a6a", 2.8, 1.5);
+        floatText(E_BASE.x, E_BASE.y-170, "PHASE UP", "#ff9c9c", 24);
+      }, update:t=>{ V.e.aura = 0.6+0.4*Math.sin(t*Math.PI); } };
+    if (e.charge) return { dur:520, start:()=>{ addLog(`${tag()}<b>${E.name}</b> ${e.msg}`); V.e.charge = 0.1; }, update:t=>{ V.e.charge = 0.1+0.9*t; } };
+    if (e.reshield) return { dur:420, start:()=>{
+        const add = Math.round(E.maxshield*e.reshield);
+        E.shield = Math.min(E.maxshield, E.shield+add);
+        addLog(`${tag()}<b>咒术师</b> 重塑护盾 <span class="heal">+${add}</span>`);
+        burst(E_BASE.x, E_BASE.y-70, 12, "#b3a1e8", 1.8, 1);
+      } };
+    if (e.proj) return { dur:640, start:()=>{ V.proj = { show:1, x:E_BASE.x, y:E_BASE.y-90, r:10 }; },
+        update:t=>{ V.proj.x = E_BASE.x + (P_BASE.x-E_BASE.x)*t; V.proj.y = E_BASE.y-90 + Math.sin(t*Math.PI)*30; },
+        end:()=>{ V.proj.show = 0; V.e.charge = 0; enemyHit(e.mult, e.name, true); } };
+    return { dur:520, start:()=>{ V.e.ox = 0; }, update:t=>{
+        if (t < .45) V.e.ox = -(E_BASE.x-P_BASE.x-80)*(t/.45);
+        else if (t < .62){ if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, false); } V.e.ox = -(E_BASE.x-P_BASE.x-80); }
+        else V.e.ox = -(E_BASE.x-P_BASE.x-80)*(1-(t-.62)/.38);
+      } };
+  }), () => endRound());
+}
+function enemyHit(mult, name, ranged){
   if (S.over) return;
   const p = S.p;
-  if (E.stunned > 0){ E.stunned--; sysLog("敌人倒地中，跳过行动"); return; }
-  S.frame += 3;
-  const tag = `<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> `;
-
-  const hitPlayer = (mult, name, opts) => {
-    const base = enemyDmg(mult, false);
-    let final = base, note = "";
-    if (p.dodgeBuff){ final = 0; note = `<span class="heal">被闪避！</span>`; }
-    else if (p.guard){
-      final = Math.round(base*.3); note = "格挡减伤 70%";
-      if (hasRelic("thorn")){
-        const ref = Math.round(base*.3);
-        E.hp = Math.max(0, E.hp - ref);
-        note += ` · 荆棘反弹 <span class="dmg">${ref}</span>`;
-      }
+  const base = enemyDmg(mult);
+  let final = base, note = "";
+  V.p.flash = 1;
+  if (p.dodgeBuff){ final = 0; note = `<span class="heal">被闪避！</span>`;
+    floatText(P_BASE.x, P_BASE.y-140, "MISS", "#7fd8a0", 20); }
+  else if (p.guard){
+    final = Math.round(base*.3); note = "格挡减伤 70%"; V.p.block = 1;
+    if (hasRelic("thorn")){
+      const ref = Math.round(base*.3);
+      E.hp = Math.max(0, E.hp-ref);
+      note += ` · 荆棘反弹 <span class="dmg">${ref}</span>`;
+      floatText(E_BASE.x+V.e.ox, E_BASE.y-150, `${ref}`, "#7fd8a0", 19);
+      burst(E_BASE.x+V.e.ox-20, E_BASE.y-70, 10, "#7fd8a0", 2, 0.6);
+      V.e.flash = 1;
     }
-    p.hp = Math.max(0, p.hp - final);
-    p.dodgeBuff = false;
-    addLog(`${tag}<b>${E.name}</b> <b>${name}</b> → ${final>0?`<span class="dmg">${final}</span> 伤害`:`<span class="heal">0 伤害</span>`} ${note}`);
-    if (E.hp <= 0){ sysLog(`${E.name} 被荆棘反噬倒下！`); endCombat(true); }
-  };
-
-  if (E.type === "guard"){
-    phaseCheckHalf(() => { E.phase = 2; sysLog("⚠ 回廊守卫进入狂暴：伤害 ×1.3，解锁连击"); });
-    const rage = E.phase === 2 ? 1.3 : 1;
-    const r = Math.random();
-    if (r < .5) hitPlayer(.8*rage, "横扫");
-    else if (r < .85) hitPlayer(1.3*rage, "重劈");
-    else { hitPlayer(1.0*rage, "突刺"); if (!S.over && E.phase===2){ S.frame += 2; hitPlayer(.7*rage, "连击·第二段"); } }
   }
-  else if (E.type === "berserker"){
-    if (E.phase === 1 && E.hp <= E.maxhp*.4){ E.phase = 2; sysLog("⚠ 血狂战士进入嗜血：每回合双动！"); }
-    const r = Math.random();
-    hitPlayer(r < .5 ? 1.0 : 1.35, r < .5 ? "挥砍" : "致命跳劈");
-    if (!S.over && E.phase === 2){ S.frame += 2; hitPlayer(.8, "嗜血追击"); }
+  if (final > 0){
+    p.hp = Math.max(0, p.hp-final);
+    V.shake = ranged?8:10;
+    burst(P_BASE.x, P_BASE.y-70, 12, "#ff8a8a", 2.2, 0.8);
+    floatText(P_BASE.x, P_BASE.y-150, `${final}`, "#ff8a8a", 22);
   }
-  else if (E.type === "sorcerer"){
-    if (E.chargeNext){
-      E.chargeNext = false;
-      hitPlayer(2.2, "末日咒术");
-      if (!S.over && E.maxshield && E.shield === 0) E.shield = Math.round(E.maxshield*.5);
-      return;
-    }
-    const r = Math.random();
-    if (r < .28){ E.chargeNext = true; addLog(`${tag}<b>咒术师</b> 开始<b>蓄力</b>（本回合受伤 +50%，下回合末日 2.2×）`); }
-    else if (r < .5 && E.shield < E.maxshield){
-      E.shield = Math.min(E.maxshield, E.shield + Math.round(E.maxshield*.35));
-      addLog(`${tag}<b>咒术师</b> 重塑护盾 <span class="heal">+${Math.round(E.maxshield*.35)}</span>`);
-    }
-    else hitPlayer(1.0, "暗影弹");
-  }
-  else if (E.type === "lord"){
-    if (E.phase === 1 && E.hp <= E.maxhp*.7){ E.phase = 2; sysLog("⚠ 回廊之主 · 第二阶段：狂暴 ×1.25"); }
-    if (E.phase === 2 && E.hp <= E.maxhp*.35){ E.phase = 3; sysLog("⚠ 回廊之主 · 最终阶段：末日循环开启"); }
-    const rage = E.phase >= 2 ? 1.25 : 1;
-    if (E.phase === 3 && S.turn % 3 === 0 && !E.chargeNext){
-      E.chargeNext = true;
-      addLog(`${tag}<b>回廊之主</b> 聚集回廊之力（受伤 +50%，下回合末日 2.4×）`);
-      return;
-    }
-    if (E.chargeNext){ E.chargeNext = false; hitPlayer(2.4*rage, "回廊末日"); return; }
-    const r = Math.random();
-    if (r < .4) hitPlayer(1.0*rage, "王权横扫");
-    else if (r < .7) hitPlayer(1.3*rage, "崩山重劈");
-    else { hitPlayer(.8*rage, "双连击"); if (!S.over){ S.frame += 2; hitPlayer(.8*rage, "双连击·二段"); } }
-  }
+  p.dodgeBuff = false;
+  addLog(`<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> <b>${E.name}</b> <b>${name}</b> → ${final>0?`<span class="dmg">${final}</span> 伤害`:`<span class="heal">0 伤害</span>`} ${note}`);
+  flushLog(); renderUI();
 }
-
-function phaseCheckHalf(fn){
-  if (E.phase === 1 && E.hp <= E.maxhp*.5) fn();
-}
-
-function afterRound(){
-  if (!S.over) checkPlayerDead();
-  flushLog(); render();
-}
-
-// ==================== 结算 ====================
-function checkEnemyDead(){
-  if (E.hp <= 0){ endCombat(true); flushLog(); render(); return true; }
-  return false;
-}
-function checkPlayerDead(){
-  if (S.p.hp <= 0){ endCombat(false); return true; }
-  return false;
-}
-function endCombat(win){
+function endRound(){
   if (S.over) return;
+  if (E.hp <= 0){ killEnemy(); return; }
+  if (S.p.hp <= 0){ playerDie(); return; }
+  renderUI();
+}
+function killEnemy(){
   S.over = true;
-  if (win){
-    meta.kills++;
-    const gain = FLOOR_SOULS(meta.floor);
-    meta.souls += gain;
-    saveGame();
-    showVictory(gain);
-  } else {
-    showDeath();
-  }
+  meta.kills++;
+  const gain = FLOOR_SOULS(meta.floor);
+  meta.souls += gain;
+  saveGame();
+  sysLog(`${E.name} 被击败！获得回廊之魂 +${gain}`);
+  flushLog();
+  runSeq([{ dur:650, start:()=>{ burst(E_BASE.x, E_BASE.y-70, 40, "#c792ea", 3.4, 1.6); V.shake = 12; },
+            update:t=>{ V.e.visible = 1-t; V.e.aura = 1-t; } }], () => showVictory(gain));
+}
+function playerDie(){
+  S.over = true;
+  sysLog("玩家倒下……回廊记得每一次倒下");
+  flushLog();
+  runSeq([{ dur:650, start:()=>{ burst(P_BASE.x, P_BASE.y-70, 30, "#ff8a8a", 3, 1.2); V.shake = 10; },
+            update:t=>{ V.p.visible = 1-t; } }], () => showDeath());
 }
 
-// ==================== 覆盖层 ====================
-const overlay = document.getElementById("overlay");
-const ovPanel = document.getElementById("ov-panel");
+/* ==================== 覆盖层 ==================== */
+const overlay = document.getElementById("overlay"), ovPanel = document.getElementById("ov-panel");
 function showOverlay(html){ ovPanel.innerHTML = html; overlay.classList.add("show"); }
 function hideOverlay(){ overlay.classList.remove("show"); }
 
@@ -510,27 +725,34 @@ function showMenu(){
   const saved = loadGame();
   showOverlay(`
     <h3>试炼回廊</h3>
-    <div class="sub">深入五层回廊，击败守卫者，夺回回廊之心。<br>死亡不会清空成长——重整旗鼓，从倒下的那层继续。</div>
+    <div class="sub">深入五层回廊，击败回廊之主，夺回回廊之心——此后回廊无尽。<br>死亡不会清空成长：魂与遗物永久保留，从倒下的那层继续。</div>
     <div class="help">
-      · 回合制：你先手。轻击快、重击狠，行动都消耗体力，每回合自然回复 6 点<br>
-      · 削韧：把敌人韧性槽打空出现<span style="color:#c792ea">处决</span>窗口（3× 无视防御）<br>
-      · 博弈：咒术师蓄力时打它伤害 +50%；格挡/闪避各有妙用<br>
-      · 每层通关：获得回廊之魂 + 遗物三选一；魂可加点攻击/生命/体力/药剂<br>
-      · 第 5 层击败回廊之主后，回廊进入无尽模式，难度继续攀升
+      · 回合制：你先手。轻击快、重击狠，行动消耗体力，每回合自然回复<br>
+      · 削韧：打空韧性槽出现<span style="color:#c792ea">处决</span>（3× 无视防御，倒地 1 回合）<br>
+      · 博弈：咒术师蓄力时打它伤害 +50%；格挡减伤 70%，闪避后轻击必暴击<br>
+      · 每层通关：回廊之魂 + 遗物三选一；魂可加点攻击/生命/体力/药剂<br>
+      · 所有角色与特效由 Canvas 程序化绘制，零图片资源
     </div>
     <button class="ovbtn" onclick="newRun()">开始新的远征</button>
     ${saved && saved.floor ? `<button class="ovbtn gray" onclick="continueRun()">继续远征（第 ${saved.floor} 层）</button>` : ""}
   `);
 }
-
+function newRun(){
+  meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0 };
+  saveGame(); startFloor();
+}
+function continueRun(){
+  const m = loadGame();
+  if (m && m.floor){ meta = m; startFloor(); } else newRun();
+}
 function showVictory(gain){
   const pool = RELICS.filter(r => !hasRelic(r.id));
   const picks = [];
-  while (picks.length < 3 && pool.length){ picks.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]); }
+  while (picks.length < 3 && pool.length) picks.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
   window._picks = picks;
   showOverlay(`
     <h3>第 ${meta.floor} 层 · 通关</h3>
-    <div class="sub">获得回廊之魂 <span class="soul">+${gain}</span>（当前 <span class="soul">${meta.souls}</span>）<br>选择一件遗物带走：</div>
+    <div class="sub">获得回廊之魂 <span class="soul">+${gain}</span>（当前 <span class="soul">${meta.souls}</span>）</div>
     <div class="choices">
       ${picks.map((r,i)=>`<div class="choice" onclick="pickRelic(${i})"><div class="cn">${r.name}</div><div class="cd">${r.desc}</div></div>`).join("")}
     </div>
@@ -540,16 +762,9 @@ function showVictory(gain){
 function pickRelic(i){
   if (i >= 0){ meta.relics.push(window._picks[i].id); sysLog(`获得遗物「${window._picks[i].name}」`); }
   else { meta.souls += 5; sysLog("放弃遗物，魂 +5"); }
-  saveGame();
-  meta.floor++;
-  saveGame();
-  showLevelUp();
+  meta.floor++; saveGame(); showLevelUp();
 }
-
-function upCost(key){
-  const u = UP_INFO[key];
-  return u.base + (meta.up[key]||0) * u.step;
-}
+const upCost = k => UP_INFO[k].base + (meta.up[k]||0)*UP_INFO[k].step;
 function showLevelUp(){
   showOverlay(`
     <h3>整备 · 前往第 ${meta.floor} 层</h3>
@@ -557,117 +772,69 @@ function showLevelUp(){
     <div class="upgrid">
       ${Object.keys(UP_INFO).map(k=>{
         const u = UP_INFO[k], cost = upCost(k), maxed = u.max && meta.up[k] >= u.max;
-        const cur = k==="atk" ? playerAtk() : k==="hp" ? playerMaxHp() : k==="st" ? playerMaxSt() : meta.potions;
+        const cur = k==="atk"?playerAtk() : k==="hp"?playerMaxHp() : k==="st"?playerMaxSt() : meta.potions;
         return `<div class="upbtn" ${maxed||meta.souls<cost?"disabled":""} onclick="buyUpgrade('${k}')">
-          <div class="un">${u.label}</div>
-          <div class="uc">${maxed?"已满级":`${cost} 魂`}</div>
-          <div class="ue">当前：${cur}${k==="atk"?" 点":k==="hp"?" 点":k==="st"?" 点":" 瓶"}</div>
-        </div>`;
+          <div class="un">${u.label}</div><div class="uc">${maxed?"已满级":cost+" 魂"}</div>
+          <div class="ue">当前 ${cur}</div></div>`;
       }).join("")}
     </div>
     <button class="ovbtn" onclick="hideOverlay();startFloor()">深入第 ${meta.floor} 层</button>
   `);
 }
 function buyUpgrade(k){
-  const cost = upCost(k);
-  const u = UP_INFO[k];
-  if (meta.souls < cost) return;
-  if (u.max && meta.up[k] >= u.max) return;
-  meta.souls -= cost;
-  meta.up[k] = (meta.up[k]||0) + 1;
-  u.eff();
-  saveGame();
-  sysLog(`强化完成：${u.label}`);
-  showLevelUp();
+  const u = UP_INFO[k], cost = upCost(k);
+  if (meta.souls < cost || (u.max && meta.up[k] >= u.max)) return;
+  meta.souls -= cost; meta.up[k]++;
+  if (k==="hp" && S) S.p.hp += 20;
+  if (k==="st" && S) S.p.st += 15;
+  saveGame(); sysLog(`强化完成：${u.label}`); showLevelUp();
 }
-function playerAtkAdd(n){ /* 属性由 meta.up 推导，无需单独存 */ }
-function playerHpAdd(n){ if (S) S.p.hp += n; }
-function playerStAdd(n){ if (S) S.p.st += n; }
-
 function showDeath(){
   showOverlay(`
     <h3 style="color:#ff8a8a">远征止步</h3>
-    <div class="sub">你倒在了第 ${meta.floor} 层的 ${E.name} 面前。<br>魂与遗物不会消失——回廊记得每一次倒下。</div>
+    <div class="sub">你倒在了第 ${meta.floor} 层的 ${E.name} 面前。<br>魂与遗物不会消失——重整旗鼓，从这一层继续。</div>
     <button class="ovbtn" onclick="retryFloor()">重整旗鼓（重战本层）</button>
     <button class="ovbtn gray" onclick="showMenu()">返回大厅</button>
   `);
 }
-function retryFloor(){
-  saveGame();
-  startFloor();
-}
+function retryFloor(){ saveGame(); startFloor(); }
 
-// ==================== 渲染 ====================
-function render(){
-  if (!meta || !S){ return; }
-  const p = S.p;
-  const pct = (v,m)=> (v/m*100).toFixed(1)+"%";
+/* ==================== DOM 面板 ==================== */
+function sysLog(t){ S.log.push(`<div class="sys">▸ ${t}</div>`); flushLog(); }
+function addLog(t){ S.log.push(`<div>${t}</div>`); flushLog(); }
+function flushLog(){
+  const el = document.getElementById("log");
+  if (!S) return;
+  el.innerHTML = S.log.join(""); el.scrollTop = el.scrollHeight;
+}
+function renderUI(){
+  if (!meta || !S) return;
   document.getElementById("ui-floor").textContent = meta.floor;
   document.getElementById("ui-souls").textContent = meta.souls;
   document.getElementById("ui-enemy-tag").textContent = E ? E.name : "-";
-
-  document.getElementById("p-hp").style.width = pct(p.hp, playerMaxHp());
-  document.getElementById("p-hp-t").textContent = `HP ${Math.ceil(p.hp)}/${playerMaxHp()}`;
-  document.getElementById("p-st").style.width = pct(p.st, playerMaxSt());
-  document.getElementById("p-st-t").textContent = `体力 ${Math.floor(p.st)}/${playerMaxSt()}`;
-
-  if (E){
-    document.getElementById("b-name").textContent = E.name;
-    document.getElementById("b-desc").textContent = E.desc || "";
-    document.getElementById("b-hp").style.width = pct(E.hp, E.maxhp);
-    document.getElementById("b-hp-t").textContent = `HP ${Math.ceil(E.hp)}/${E.maxhp}`;
-    document.getElementById("b-poise").style.width = pct(E.poise, E.maxpoise);
-    document.getElementById("b-poise-t").textContent = `韧性 ${Math.ceil(E.poise)}/${E.maxpoise}`;
-    const ph = document.getElementById("boss-phase");
-    const phNames = { 1:"阶段 1", 2:"阶段 2", 3:"最终阶段" };
-    ph.textContent = phNames[E.phase] || "-";
-    ph.className = "phase-badge " + (E.phase===1?"p1":"p2");
-    const shdBar = document.getElementById("b-shd-bar");
-    if (E.maxshield){
-      shdBar.style.display = "block";
-      document.getElementById("b-shd").style.width = pct(E.shield, E.maxshield);
-      document.getElementById("b-shd-t").textContent = `护盾 ${Math.ceil(E.shield)}/${E.maxshield}`;
-    } else shdBar.style.display = "none";
-  }
-
-  const btn = document.getElementById("btn-riposte");
-  btn.style.display = E && E.poise === 0 && !S.over ? "block" : "none";
-  const potBtn = document.querySelector("#actions .act:last-child .cost");
-  if (potBtn) potBtn.textContent = `剩 ${meta.potions} 次`;
-
-  let cond = [];
-  if (p.guard) cond.push("格挡中");
-  if (p.dodgeBuff) cond.push("闪避强化");
-  document.getElementById("p-cond").textContent = cond.join(" · ");
-
-  document.getElementById("s-frame").textContent = S.frame;
+  document.getElementById("btn-riposte").style.display = E && E.poise===0 && !S.over ? "block" : "none";
+  document.getElementById("pot-cost").textContent = `剩 ${meta.potions}`;
   document.getElementById("s-turn").textContent = S.turn;
+  document.getElementById("s-frame").textContent = S.frame;
   document.getElementById("s-dps").textContent = S.turn>0 ? (S.stats.dmg/S.turn).toFixed(1) : "-";
+  document.getElementById("s-crit").textContent = `${S.stats.crits}/${S.stats.execs}`;
   document.getElementById("s-hit").textContent = S.stats.swings>0 ? Math.round(S.stats.hits/S.stats.swings*100)+"%" : "-";
-  document.getElementById("s-crit").textContent = `${S.stats.crits} / ${S.stats.execs}`;
   document.getElementById("s-kill").textContent = meta.kills;
-
-  document.getElementById("bl-atk").textContent = playerAtk();
-  document.getElementById("bl-hp").textContent = playerMaxHp();
-  document.getElementById("bl-st").textContent = playerMaxSt();
+  document.getElementById("bl-stats").textContent = `${playerAtk()} / ${playerMaxHp()} / ${playerMaxSt()}`;
   document.getElementById("bl-pot").textContent = meta.potions;
   document.getElementById("bl-relics").innerHTML = meta.relics.length
     ? meta.relics.map(id => { const r = RELICS.find(x=>x.id===id); return `<span>${r?r.name:id}</span>`; }).join("")
     : `<span style="opacity:.4">暂无遗物</span>`;
+  unlockUI();
+  if (S.over) lockUI();
 }
 
-function sysLog(t){ S.log.push(`<div class="sys">▸ ${t}</div>`); }
-function addLog(t){ S.log.push(`<div>${t}</div>`); }
-function flushLog(){
-  const el = document.getElementById("log");
-  el.innerHTML = S.log.join("");
-  el.scrollTop = el.scrollHeight;
-}
-
-// 启动
+/* ==================== 启动 ==================== */
 meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0 };
-S = { frame:0, turn:0, over:true, p:{hp:100,st:100,guard:false,dodgeBuff:false}, stats:{swings:0,hits:0,crits:0,execs:0,dmg:0}, log:[] };
-E = null;
+S = { frame:0, turn:0, over:true, log:[],
+      p:{ hp:100, st:100, guard:false, dodgeBuff:false },
+      stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
+E = { type:"guard", name:"-", desc:"", maxhp:1, hp:1, poise:1, maxpoise:1, atk:0, def:0, phase:1, stunned:0, shield:0, maxshield:0, chargeNext:false };
 showMenu();
 </script>
 </body>
