@@ -86,7 +86,7 @@
         <div class="act" data-k="guard"><div class="nm">格挡</div><div class="cost">回复 15 体力</div><div class="desc">减伤 70% · 荆棘反弹</div></div>
         <div class="act" data-k="dodge"><div class="nm">闪避</div><div class="cost">体力 20</div><div class="desc">完全规避 · 反击必暴</div></div>
         <div class="act" data-k="riposte" id="btn-riposte" style="display:none"><div class="nm" style="color:#c792ea">处决</div><div class="cost">韧性已破</div><div class="desc">3.0× 无视防御</div></div>
-        <div class="act" data-k="potion"><div class="nm">药剂</div><div class="cost" id="pot-cost">剩 2</div><div class="desc">恢复 30 HP</div></div>
+        <div class="act" data-k="potion"><div class="nm">药剂</div><div class="cost" id="pot-cost">剩 2</div><div class="desc">恢复 35 HP</div></div>
         <div class="act" onclick="switchStance()"><div class="nm">站位</div><div class="cost" id="stance-cost">中立</div><div class="desc">切换战斗姿态</div></div>
         <div class="act" data-k="finisher" id="btn-finisher" style="display:none"><div class="nm" style="color:#ffd76e">终结技</div><div class="cost">连击 3 层</div><div class="desc">4× 必暴击</div></div>
       </div>
@@ -138,10 +138,10 @@
 "use strict";
 /* ==================== 配置 ==================== */
 const ENEMIES = {
-  guard:     { name:"回廊守卫", hp:150, atk:10, def:25, poise:50, desc:"半血狂暴" },
-  berserker: { name:"血狂战士", hp:120, atk:13, def:10, poise:40, desc:"低血嗜血双动" },
-  sorcerer:  { name:"咒术师",   hp:130, atk:12, def:15, poise:60, shield:.22, desc:"护盾+蓄力" },
-  lord:      { name:"回廊之主", hp:240, atk:14, def:25, poise:90, desc:"三阶段" },
+  guard:     { name:"回廊守卫", hp:200, atk:10, def:25, poise:50, desc:"半血狂暴" },
+  berserker: { name:"血狂战士", hp:170, atk:13, def:10, poise:40, desc:"低血嗜血双动" },
+  sorcerer:  { name:"咒术师",   hp:180, atk:12, def:15, poise:60, shield:.22, desc:"护盾+蓄力" },
+  lord:      { name:"回廊之主", hp:270, atk:13, def:25, poise:90, desc:"三阶段" },
 };
 
 const ELEMENTS = {
@@ -180,12 +180,12 @@ const RELICS = [
   { id:"hammer", name:"碎甲锤",   desc:"削韧 +50%" },
   { id:"leech",  name:"吸血剑",   desc:"伤害 12% 转化生命（至多 8）" },
   { id:"will",   name:"战意",     desc:"每回合体力回复 10 → 16" },
-  { id:"pouch",  name:"老兵药囊", desc:"药剂 +1，恢复 30 → 40" },
+  { id:"pouch",  name:"老兵药囊", desc:"药剂 +1，恢复 35 → 45" },
   { id:"hunter", name:"猎人直觉", desc:"处决 3.0× → 4.0×" },
 ];
 const UP_INFO = {
-  atk: { label:"利刃 · 攻击 +4",    base:10, step:6 },
-  hp:  { label:"铁骨 · 生命 +20",   base:12, step:7 },
+  atk: { label:"利刃 · 攻击 +4",    base:9,  step:5 },
+  hp:  { label:"铁骨 · 生命 +20",   base:10, step:6 },
   st:  { label:"呼吸法 · 体力 +15", base:8,  step:5 },
   pot: { label:"行囊 · 药剂 +1",    base:15, step:10, max:2 },
 };
@@ -512,8 +512,8 @@ function startFloor(){
 }
 function spawnEnemy(key){
   const t = ENEMIES[key], f = meta.floor;
-  const sHp = 1 + .25*(Math.min(f,5)-1) + Math.max(0,f-5)*.08;
-  const sAtk = 1 + .13*(Math.min(f,5)-1) + Math.max(0,f-5)*.06;
+  const sHp = 1 + .18*(Math.min(f,5)-1) + Math.max(0,f-5)*.06;
+  const sAtk = 1 + .11*(Math.min(f,5)-1) + Math.max(0,f-5)*.05;
   E = { type:key, name:t.name, desc:t.desc,
     maxhp:Math.round(t.hp*sHp), atk:+(t.atk*sAtk).toFixed(1), def:t.def,
     maxpoise:Math.round(t.poise*(1+.08*(Math.min(f,5)-1))),
@@ -594,7 +594,7 @@ function playerAct(kind){
   }
   if (kind === "potion"){
     meta.potions--;
-    const heal = hasRelic("pouch")?40:30;
+    const heal = hasRelic("pouch")?45:35;
     p.hp = Math.min(playerMaxHp(), p.hp+heal);
     addLog(`${h}玩家使用药剂 <span class="heal">+${heal} HP</span>（剩 ${meta.potions}）`);
     runSeq([{ dur:420, start:()=>{ burst(P_BASE.x, P_BASE.y-70, 14, "#7fd8a0", 1.6, 1.4);
