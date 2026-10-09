@@ -378,6 +378,15 @@ let lastT = 0;
 function loop(ts){
   const dt = Math.min(50, ts - lastT || 16); lastT = ts; V.t += dt;
   tickQueue(dt);
+  // 血条平滑插值（显示层追赶真实值）
+  if (S && E){
+    const k = Math.min(1, dt * 0.012);
+    Dp.hp  += (S.p.hp  - Dp.hp)  * k;
+    Dp.st  += (S.p.st  - Dp.st)  * k;
+    De.hp   += (E.hp     - De.hp)   * k;
+    De.poise+= (E.poise  - De.poise)* k;
+    De.shd  += (E.shield - De.shd)  * k;
+  }
   cx.clearRect(0,0,W,H);
   cx.save();
   if (V.shake > 0.5){ cx.translate((Math.random()-0.5)*V.shake, (Math.random()-0.5)*V.shake); V.shake *= Math.pow(0.9, dt/16); } else V.shake = 0;
