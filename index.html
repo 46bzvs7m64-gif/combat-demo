@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>试炼回廊 · 回合制战斗原型</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#1a1a2e; background:#12121f; padding:16px; }
+  .container { max-width:1060px; margin:0 auto; }
+  h1 { font-size:22px; color:#e8e8f0; }
+  .subtitle { font-size:12px; color:#8a8aa0; margin:4px 0 16px; }
+  .layout { display:flex; gap:14px; align-items:flex-start; }
+  .arena { flex:1.6; min-width:0; }
+  .side { flex:1; min-width:0; }
+  .panel { background:#1c1c30; border:1px solid #2e2e4a; border-radius:10px; padding:14px; margin-bottom:14px; }
+  .panel h2 { font-size:13px; color:#a8b3ff; margin-bottom:10px; display:flex; justify-content:space-between; }
+  .panel h2 .hint { font-size:10px; color:#666; font-weight:400; }
+  /* 单位条 */
+  .unit { margin-bottom:10px; }
+  .unit .row { display:flex; justify-content:space-between; font-size:12px; color:#ccc; margin-bottom:4px; }
+  .unit .row b { color:#fff; }
+  .bar { height:12px; background:#2a2a44; border-radius:6px; overflow:hidden; margin-bottom:3px; position:relative; }
+  .bar .fill { height:100%; transition:width .3s; }
+  .bar .txt { position:absolute; left:8px; top:-1px; font-size:10px; color:#fff; text-shadow:0 1px 2px #000; line-height:12px; }
+  .hp .fill { background:linear-gradient(90deg,#e04a4a,#ff7b7b); }
+  .poise .fill { background:linear-gradient(90deg,#d9a441,#ffd88a); }
+  .stam .fill { background:linear-gradient(90deg,#3f9e5f,#7fd8a0); }
+  .phase-badge { font-size:10px; padding:2px 10px; border-radius:10px; font-weight:700; }
+  .phase-badge.p1 { background:#2e2e4a; color:#a8b3ff; }
+  .phase-badge.p2 { background:#5c2424; color:#ff9c9c; animation:blink 1s infinite; }
+  @keyframes blink { 50% { opacity:.5; } }
+  /* 行动按钮 */
+  .actions { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .act { padding:9px 6px; border:1px solid #3a3a5c; border-radius:8px; background:#23233c; color:#dde; cursor:pointer; text-align:center; transition:all .15s; }
+  .act:hover:not(:disabled) { border-color:#6673ff; background:#2b2b4d; }
+  .act:disabled { opacity:.35; cursor:not-allowed; }
+  .act .nm { font-size:13px; font-weight:700; }
+  .act .cost { font-size:10px; color:#8a8aa0; margin-top:2px; }
+  .act .desc { font-size:9.5px; color:#70708a; margin-top:2px; line-height:1.35; }
+  /* 日志 */
+  .log { height:250px; overflow-y:auto; font-size:11px; line-height:1.7; }
+  .log div { padding:1px 0; border-bottom:1px solid #23233c; }
+  .log .frm { color:#5f6f9f; font-size:9.5px; }
+  .log .dmg { color:#ff8a8a; font-weight:700; }
+  .log .crit { color:#ffd76e; font-weight:700; }
+  .log .heal { color:#7fd8a0; }
+  .log .sys { color:#8a8aa0; }
+  .log .exec { color:#c792ea; font-weight:700; }
+  /* 统计 */
+  .stat-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
+  .stat-grid .st { background:#23233c; border-radius:6px; padding:7px 10px; }
+  .stat-grid .st .l { font-size:10px; color:#8a8aa0; }
+  .stat-grid .st .v { font-size:15px; font-weight:700; color:#e8e8f0; }
+  /* 参数滑块 */
+  .param { margin-bottom:10px; }
+  .param .pl { display:flex; justify-content:space-between; font-size:11px; color:#bbb; margin-bottom:3px; }
+  .param input[type=range] { width:100%; accent-color:#6673ff; }
+  .result { text-align:center; font-size:16px; font-weight:700; padding:8px; border-radius:8px; margin-bottom:10px; display:none; }
+  .result.win { display:block; background:#1d3a2a; color:#7fd8a0; }
+  .result.lose { display:block; background:#3a1d1d; color:#ff8a8a; }
+  button.reset { width:100%; padding:8px; border:1px solid #3a3a5c; border-radius:8px; background:#23233c; color:#dde; cursor:pointer; font-size:12px; }
+  button.reset:hover { border-color:#6673ff; }
+  .formula { font-size:10.5px; color:#9aa; line-height:1.8; }
+  .formula code { color:#c792ea; background:#23233c; padding:1px 5px; border-radius:4px; font-size:10px; }
+  .footer { text-align:center; font-size:11px; color:#666; margin-top:16px; }
+  @media (max-width:800px){ .layout{flex-direction:column;} .side{width:100%;} }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>试炼回廊 · 回合制战斗原型</h1>
+  <div class="subtitle">独立设计的战斗系统验证 Demo：前摇/后摇帧 · 体力资源 · 削韧处决 · 两阶段 BOSS AI · 伤害公式白盒可调 · 原生 JS 零依赖</div>
+
+  <div class="layout">
+    <!-- ============ 左：战场 ============ -->
+    <div class="arena">
+      <div class="panel">
+        <h2>战场 <span class="hint">回合制 · 玩家先手 · BOSS 按行为树行动</span></h2>
+        <div class="result" id="result"></div>
+
+        <div class="unit">
+          <div class="row"><span><b>玩家</b> · 流浪剑士</span><span id="p-cond"></span></div>
+          <div class="bar hp"><div class="fill" id="p-hp"></div><div class="txt" id="p-hp-t"></div></div>
+          <div class="bar stam"><div class="fill" id="p-st"></div><div class="txt" id="p-st-t"></div></div>
+        </div>
+
+        <div class="unit">
+          <div class="row"><span><b>BOSS</b> · 回廊守卫</span><span class="phase-badge p1" id="boss-phase">阶段 1</span></div>
+          <div class="bar hp"><div class="fill" id="b-hp"></div><div class="txt" id="b-hp-t"></div></div>
+          <div class="bar poise"><div class="fill" id="b-poise"></div><div class="txt" id="b-poise-t"></div></div>
+        </div>
+
+        <div class="actions" id="actions">
+          <div class="act" onclick="playerAct('light')">
+            <div class="nm">轻击</div><div class="cost">体力 25</div>
+            <div class="desc">前摇2帧 后摇1帧<br>1.0× 伤害 · 削韧 10</div>
+          </div>
+          <div class="act" onclick="playerAct('heavy')">
+            <div class="nm">重击</div><div class="cost">体力 40</div>
+            <div class="desc">前摇4帧 后摇3帧<br>1.8× 伤害 · 削韧 25</div>
+          </div>
+          <div class="act" onclick="playerAct('guard')">
+            <div class="nm">格挡</div><div class="cost">恢复 15 体力</div>
+            <div class="desc">本回合受击减伤 70%<br>被击中削韧恢复 5</div>
+          </div>
+          <div class="act" onclick="playerAct('dodge')">
+            <div class="nm">闪避</div><div class="cost">体力 20</div>
+            <div class="desc">100% 规避本回合伤害<br>闪避后轻击必暴击</div>
+          </div>
+          <div class="act" onclick="playerAct('riposte')" id="btn-riposte" style="display:none">
+            <div class="nm" style="color:#c792ea">处决</div><div class="cost">韧性已破</div>
+            <div class="desc">3.0× 伤害 · 无视防御<br>处决后 BOSS 倒地 1 回合</div>
+          </div>
+          <div class="act" onclick="playerAct('potion')">
+            <div class="nm">药剂</div><div class="cost">限 2 次</div>
+            <div class="desc">恢复 30 HP · 消耗整回合</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>战斗统计 <span class="hint">白盒验证面板</span></h2>
+        <div class="stat-grid">
+          <div class="st"><div class="l">当前帧</div><div class="v" id="s-frame">0</div></div>
+          <div class="st"><div class="l">回合数</div><div class="v" id="s-turn">0</div></div>
+          <div class="st"><div class="l">玩家输出 DPS</div><div class="v" id="s-dps">-</div></div>
+          <div class="st"><div class="l">命中率</div><div class="v" id="s-hit">-</div></div>
+          <div class="st"><div class="l">暴击次数</div><div class="v" id="s-crit">0</div></div>
+          <div class="st"><div class="l">处决次数</div><div class="v" id="s-exec">0</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 右：日志与数值 ============ -->
+    <div class="side">
+      <div class="panel">
+        <h2>战斗日志 <span class="hint">帧级记录</span></h2>
+        <div class="log" id="log"></div>
+      </div>
+
+      <div class="panel">
+        <h2>伤害公式</h2>
+        <div class="formula">
+          最终伤害 = <code>ATK × 招式倍率 × 防御减免 × 暴击 × 浮动</code><br>
+          防御减免 = <code>1 − DEF/(DEF+100)</code><br>
+          暴击 = <code>1.5×（轻击基础 15%，闪避反击 100%）</code><br>
+          浮动 = <code>0.9 ~ 1.1 随机</code>；格挡时 ×<code>0.3</code><br>
+          韧性破 → 进入处决窗口，处决 <code>3.0× 无视防御</code>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>平衡参数 <span class="hint">实时可调 · 观察胜率变化</span></h2>
+        <div class="param">
+          <div class="pl"><span>玩家攻击力</span><span id="v-atk">22</span></div>
+          <input type="range" id="p-atk" min="12" max="40" value="22" oninput="updParams()">
+        </div>
+        <div class="param">
+          <div class="pl"><span>玩家体力上限</span><span id="v-stam">100</span></div>
+          <input type="range" id="p-stam" min="70" max="140" value="100" oninput="updParams()">
+        </div>
+        <div class="param">
+          <div class="pl"><span>BOSS 防御</span><span id="v-def">30</span></div>
+          <input type="range" id="p-def" min="0" max="80" value="30" oninput="updParams()">
+        </div>
+        <div class="param">
+          <div class="pl"><span>BOSS 韧性上限</span><span id="v-poise">60</span></div>
+          <input type="range" id="p-poise" min="30" max="120" value="60" oninput="updParams()">
+        </div>
+        <button class="reset" onclick="init()">应用参数并重开</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">试炼回廊 · 战斗系统原型 · 演示数值为自建平衡集 · github.com/46bzvs7m64-gif/combat-demo</div>
+</div>
+
+<script>
+// ================= 数值配置（策划可调白盒） =================
+const P = { atk:22, maxhp:100, maxst:100 };
+const B = { maxhp:320, def:30, maxpoise:60, phase2dmg:1.3 };
+
+const MOVES = {
+  light:  { name:"轻击", cost:25, startup:2, recovery:1, mult:1.0, poise:10, critBase:0.15 },
+  heavy:  { name:"重击", cost:40, startup:4, recovery:3, mult:1.8, poise:25, critBase:0.15 },
+};
+
+let S; // 战斗状态
+function init(){
+  S = {
+    frame:0, turn:0,
+    p:{ hp:P.maxhp, st:P.maxst, guard:false, dodgeBuff:false, potions:2 },
+    b:{ hp:B.maxhp, poise:B.maxpoise, phase:1, stunned:0, angryUsed:false },
+    log:[], stats:{ hits:0, swings:0, crits:0, execs:0, dmgDealt:0 },
+    over:false,
+  };
+  document.getElementById("log").innerHTML = "";
+  sysLog("战斗开始 · BOSS 阶段 1（常规行为树）");
+  render();
+}
+
+function sysLog(t){ S.log.push(`<div class="sys">▸ ${t}</div>`); }
+function addLog(t){ S.log.push(`<div>${t}</div>`); }
+function flushLog(){
+  const el = document.getElementById("log");
+  el.innerHTML = S.log.join("");
+  el.scrollTop = el.scrollHeight;
+}
+
+// ================= 伤害公式 =================
+function dmgCalc(mult, def, crit){
+  const float = 0.9 + Math.random()*0.2;
+  const defRed = 1 - def/(def+100);
+  return Math.max(1, Math.round(P.atk * mult * defRed * (crit?1.5:1) * float));
+}
+
+// ================= 玩家行动 =================
+function playerAct(kind){
+  if (S.over) return;
+  const p = S.p, b = S.b;
+  S.turn++; S.frame += 2; // 决策帧
+  p.guard = false;
+  let logHtml = `<span class="frm">[T${S.turn} F${S.frame}]</span> `;
+
+  // —— 处决：韧性破窗口 ——
+  if (kind === "riposte"){
+    if (b.poise > 0) return;
+    const crit = true;
+    const d = Math.round(P.atk * 3.0 * (crit?1.5:1)); // 无视防御
+    b.hp = Math.max(0, b.hp - d);
+    S.stats.execs++; S.stats.dmgDealt += d; S.frame += 4;
+    logHtml += `玩家发动 <span class="exec">处决</span> → <span class="crit">${d}</span> 伤害（无视防御）`;
+    addLog(logHtml);
+    b.stunned = 1; b.poise = B.maxpoise; // 倒地1回合，韧性回满
+    sysLog("BOSS 被处决后倒地 1 回合，韧性已重置");
+    endCheck(); if (S.over) { flushLog(); render(); return; }
+    bossAct(); flushLog(); render(); return;
+  }
+
+  // —— 药剂 ——
+  if (kind === "potion"){
+    if (p.potions <= 0) return;
+    p.potions--; p.hp = Math.min(P.maxhp, p.hp + 30); S.frame += 2;
+    logHtml += `玩家使用药剂 <span class="heal">+30 HP</span>（剩余 ${p.potions}）`;
+    addLog(logHtml);
+    bossAct(); endCheck(); flushLog(); render(); return;
+  }
+
+  // —— 格挡 ——
+  if (kind === "guard"){
+    p.guard = true; p.st = Math.min(P.maxst, p.st + 15); S.frame += 2;
+    logHtml += `玩家 <b>格挡</b>，体力 <span class="heal">+15</span>，本回合减伤 70%`;
+    addLog(logHtml);
+    bossAct(); endCheck(); flushLog(); render(); return;
+  }
+
+  // —— 闪避 ——
+  if (kind === "dodge"){
+    if (p.st < 20) { sysLog("体力不足，无法闪避"); flushLog(); render(); return; }
+    p.st -= 20; p.dodgeBuff = true; S.frame += 2;
+    logHtml += `玩家 <b>闪避</b>，完全规避本回合伤害，下次轻击必暴击`;
+    addLog(logHtml);
+    bossAct(); endCheck(); flushLog(); render(); return;
+  }
+
+  // —— 攻击（含前后摇帧） ——
+  const mv = MOVES[kind];
+  if (p.st < mv.cost) { sysLog(`体力不足（需 ${mv.cost}，当前 ${p.st}）`); S.turn--; flushLog(); render(); return; }
+  p.st -= mv.cost;
+  S.frame += mv.startup;
+  const crit = p.dodgeBuff && kind === "light" ? true : Math.random() < mv.critBase;
+  const d = dmgCalc(mv.mult, B.def, crit);
+  b.hp = Math.max(0, b.hp - d);
+  b.poise = Math.max(0, b.poise - mv.poise);
+  S.stats.swings++; S.stats.hits++; S.stats.dmgDealt += d;
+  if (crit) S.stats.crits++;
+  p.dodgeBuff = false;
+  S.frame += mv.recovery;
+  logHtml += `玩家 <b>${mv.name}</b>（前摇${mv.startup}→命中→后摇${mv.recovery}）→ ${crit?`<span class="crit">暴击 ${d}</span>`:`<span class="dmg">${d}</span> 伤害`} · 削韧 ${mv.poise}`;
+  addLog(logHtml);
+
+  if (b.poise === 0){ sysLog("⚠ BOSS 韧性破！出现处决窗口"); }
+
+  endCheck(); if (S.over) { flushLog(); render(); return; }
+  bossAct();
+  endCheck();
+  flushLog(); render();
+}
+
+// ================= BOSS AI（行为树：按血量阶段 + 权重） =================
+function bossAct(){
+  const b = S.b, p = S.p;
+  if (b.stunned > 0){
+    b.stunned--; sysLog("BOSS 处于倒地，跳过行动");
+    if (b.stunned === 0) sysLog("BOSS 起身");
+    return;
+  }
+  // 阶段切换
+  if (b.phase === 1 && b.hp <= B.maxhp * 0.5){
+    b.phase = 2; sysLog("⚠ BOSS 进入阶段 2：狂暴（伤害 ×1.3，解锁连击）");
+  }
+  S.frame += 3; // BOSS 动作前摇
+  const r = Math.random();
+  let mult = 0, name = "", poiseToP = 0;
+  if (b.phase === 1){
+    if (r < 0.5){ mult=0.8; name="横扫"; poiseToP=0; }
+    else if (r < 0.85){ mult=1.3; name="重劈"; poiseToP=0; }
+    else { mult=1.0; name="蓄力突刺"; poiseToP=0; }
+  } else {
+    if (r < 0.35){ mult=1.0; name="横扫"; }
+    else if (r < 0.6){ mult=1.3; name="重劈"; }
+    else if (r < 0.85){ mult=0.6; name="双连击×2"; mult=0.6*2; }
+    else { mult=1.6; name="狂暴突刺"; }
+  }
+  const base = dmgCalc(mult * (b.phase===2 ? B.phase2dmg : 1), 0, false);
+  let final = base;
+  let note = "";
+  if (p.dodgeBuff){ final = 0; note = `<span class="heal">被闪避！</span>`; }
+  else if (p.guard){ final = Math.round(base*0.3); note = `格挡减伤 70%`; }
+  p.hp = Math.max(0, p.hp - final);
+  addLog(`<span class="frm">[T${S.turn} F${S.frame}]</span> BOSS <b>${name}</b>${b.phase===2?'（狂暴）':''} → ${final>0?`<span class="dmg">${final}</span> 伤害`:'<span class="heal">0 伤害</span>'} ${note}`);
+}
+
+// ================= 结算 =================
+function endCheck(){
+  if (S.b.hp <= 0){
+    S.over = true;
+    const el = document.getElementById("result");
+    el.className = "result win";
+    el.textContent = `🏆 胜利！用时 ${S.turn} 回合 / ${S.frame} 帧`;
+    sysLog(`战斗结束：胜利（${S.turn} 回合）`);
+  } else if (S.p.hp <= 0){
+    S.over = true;
+    const el = document.getElementById("result");
+    el.className = "result lose";
+    el.textContent = `💀 战败 · 撑过 ${S.turn} 回合`;
+    sysLog(`战斗结束：战败（${S.turn} 回合）`);
+  }
+}
+
+// ================= 渲染 =================
+function render(){
+  const p = S.p, b = S.b;
+  const pct = (v,m)=> (v/m*100).toFixed(1)+"%";
+  document.getElementById("p-hp").style.width = pct(p.hp, P.maxhp);
+  document.getElementById("p-hp-t").textContent = `HP ${p.hp}/${P.maxhp}`;
+  document.getElementById("p-st").style.width = pct(p.st, P.maxst);
+  document.getElementById("p-st-t").textContent = `体力 ${p.st}/${P.maxst}`;
+  document.getElementById("b-hp").style.width = pct(b.hp, B.maxhp);
+  document.getElementById("b-hp-t").textContent = `HP ${b.hp}/${B.maxhp}`;
+  document.getElementById("b-poise").style.width = pct(b.poise, B.maxpoise);
+  document.getElementById("b-poise-t").textContent = `韧性 ${b.poise}/${B.maxpoise}`;
+  const ph = document.getElementById("boss-phase");
+  ph.textContent = b.phase===1 ? "阶段 1" : "阶段 2 · 狂暴";
+  ph.className = "phase-badge " + (b.phase===1?"p1":"p2");
+
+  // 处决按钮
+  const btn = document.getElementById("btn-riposte");
+  btn.style.display = b.poise === 0 ? "block" : "none";
+
+  // 状态标签
+  let cond = [];
+  if (p.guard) cond.push("格挡中");
+  if (p.dodgeBuff) cond.push("闪避强化");
+  if (p.potions>0) cond.push(`药剂×${p.potions}`);
+  document.getElementById("p-cond").textContent = cond.join(" · ");
+
+  // 统计
+  document.getElementById("s-frame").textContent = S.frame;
+  document.getElementById("s-turn").textContent = S.turn;
+  document.getElementById("s-dps").textContent = S.turn>0 ? (S.stats.dmgDealt/S.turn).toFixed(1) : "-";
+  document.getElementById("s-hit").textContent = S.stats.swings>0 ? Math.round(S.stats.hits/S.stats.swings*100)+"%" : "-";
+  document.getElementById("s-crit").textContent = S.stats.crits;
+  document.getElementById("s-exec").textContent = S.stats.execs;
+}
+
+// ================= 参数面板 =================
+function updParams(){
+  document.getElementById("v-atk").textContent = document.getElementById("p-atk").value;
+  document.getElementById("v-stam").textContent = document.getElementById("p-stam").value;
+  document.getElementById("v-def").textContent = document.getElementById("p-def").value;
+  document.getElementById("v-poise").textContent = document.getElementById("p-poise").value;
+}
+
+// 应用参数并重开（读取滑块 → 重置）
+document.getElementById("p-atk").addEventListener("change", applyAndReset);
+document.getElementById("p-stam").addEventListener("change", applyAndReset);
+document.getElementById("p-def").addEventListener("change", applyAndReset);
+document.getElementById("p-poise").addEventListener("change", applyAndReset);
+
+function applyAndReset(){
+  P.atk = +document.getElementById("p-atk").value;
+  P.maxst = +document.getElementById("p-stam").value;
+  B.def = +document.getElementById("p-def").value;
+  B.maxpoise = +document.getElementById("p-poise").value;
+  P.maxhp = 100;
+  init();
+}
+
+init();
+</script>
+</body>
+</html>
