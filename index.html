@@ -1134,6 +1134,23 @@ function loop(ts){
     if (p.ring){ p.r += p.vr*dt/16; p.life -= p.dec*dt/16;
       cx.globalAlpha = Math.max(0,p.life); cx.strokeStyle = p.color; cx.lineWidth = p.lw*(p.life);
       cx.beginPath(); cx.arc(p.x,p.y,p.r,0,7); cx.stroke(); cx.globalAlpha = 1; return; }
+    if (p.beam){ p.life -= p.dec*dt/16;
+      cx.globalAlpha = Math.max(0,Math.min(1,p.life));
+      const bg = cx.createLinearGradient(0,p.y,0,p.y+p.h);
+      bg.addColorStop(0,p.color); bg.addColorStop(1,"rgba(255,215,110,0)");
+      cx.fillStyle = bg; cx.fillRect(p.x-p.w/2, p.y, p.w, p.h);
+      cx.globalAlpha = 1; return; }
+    if (p.home){ p.life -= p.dec*dt/16;
+      p.tx = P_BASE.x + V.p.ox; p.ty = P_BASE.y - 78;
+      const dx = p.tx-p.x, dy = p.ty-p.y, dist = Math.hypot(dx,dy);
+      const k = Math.min(.22, .038*dt/16);
+      p.x += dx*k; p.y += dy*k;
+      if (dist < 26){ p.life -= .1*dt/16;
+        if (!p.pop){ p.pop = 1;
+          for (let j=0;j<4;j++) particles.push({ x:p.x, y:p.y, vx:(Math.random()-.5)*2.4, vy:-1-Math.random()*2, life:.7, dec:.02, color:"#ffd76e", r:1.4+Math.random()*1.6, g:.05 });
+        } }
+      cx.globalAlpha = Math.max(0,Math.min(1,p.life)); cx.fillStyle = p.color;
+      cx.beginPath(); cx.arc(p.x,p.y,p.r*(0.7+0.3*Math.min(1,p.life)),0,7); cx.fill(); cx.globalAlpha = 1; return; }
     p.x += p.vx*dt/16; p.y += p.vy*dt/16; if (p.g) p.vy += p.g*dt/16; p.life -= p.dec*dt/16;
     cx.globalAlpha = Math.max(0,Math.min(1,p.life)); cx.fillStyle = p.color;
     cx.beginPath(); cx.arc(p.x,p.y,p.r,0,7); cx.fill(); cx.globalAlpha = 1;
@@ -1950,15 +1967,53 @@ function killEnemy(){
   sysLog(`${E.name} 被击败！获得回廊之魂 +${gain}`);
   flushLog();
   runSeq([
-    { dur:700, start:()=>{
+    // 一段：敌人湮灭 —— 三重冲击环 + 灵魂光柱 + 光珠升天 + 旋转消散
+    { dur:620, start:()=>{
         burst(E_BASE.x, E_BASE.y-70, 44, "#c792ea", 3.4, 1.6);
-        burst(E_BASE.x, E_BASE.y-70, 20, "#ffd76e", 2.6, 2);
-        rain(26, "#ffd76e"); rain(14, "#e8d5ff");
+        burst(E_BASE.x, E_BASE.y-70, 26, "#ffd76e", 2.8, 1.8);
+        rain(30, "#ffd76e"); rain(16, "#e8d5ff");
         ringFx(E_BASE.x, E_BASE.y-70, "rgba(199,146,234,.9)");
-        V.shake = 12; V.fullflash = .3;
-      }, update:t=>{ V.e.visible = 1-t; V.e.aura = 1-t;
-        V.e.z = 34*Math.sin(t*Math.PI); V.e.rot = .9*t; V.e.sq = 1-.3*t; V.e.zs = 1-.12*t; } },
-  ], () => showVictory(gain));
+        particles.push({ ring:1, x:E_BASE.x, y:E_BASE.y-70, r:6, vr:4.4, life:1, dec:.028, color:"rgba(255,215,110,.9)", lw:6 });
+        particles.push({ ring:1, x:E_BASE.x, y:E_BASE.y-70, r:2, vr:2.6, life:1, dec:.02, color:"rgba(232,213,255,.8)", lw:4 });
+        particles.push({ beam:1, x:E_BASE.x, y:E_BASE.y-330, w:26, h:300, life:1, dec:.011, color:"rgba(255,225,140,.5)" });
+        particles.push({ beam:1, x:E_BASE.x, y:E_BASE.y-330, w:8, h:300, life:1, dec:.017, color:"rgba(255,255,255,.75)" });
+        V.shake = 12; V.fullflash = .34; V.cz = 1.08;
+        for (let i=0;i<14;i++) particles.push({ x:E_BASE.x-24+Math.random()*48, y:E_BASE.y-30-Math.random()*90,
+          vx:(Math.random()-.5)*1.2, vy:-1.4-Math.random()*1.6, life:1.2, dec:.008,
+          color:i%2?"#ffd76e":"#fff3c4", r:1.6+Math.random()*2.2, g:-.012 });
+      },
+      update:t=>{
+        V.e.visible = 1-t; V.e.aura = 1-t;
+        V.e.z = 44*Math.sin(t*Math.PI*.9); V.e.rot = 1.5*t; V.e.sq = 1-.34*t; V.e.zs = 1-.14*t;
+        V.cz = 1.08-.04*t;
+      } },
+    // 二段A：玩家跃起空翻凯旋
+    { dur:400, update:t=>{
+        V.p.z = 84*Math.sin(t*Math.PI); V.p.rot = -Math.PI*2*t;
+        V.p.zs = 1.12-.04*t; V.p.sq = 1-.1*Math.sin(t*Math.PI);
+        if (Math.random()<.55) afterimages.push({who:'p',ox:V.p.ox,life:.8});
+      } },
+    // 二段B：落地金环 + VICTORY 字样
+    { dur:120, start:()=>{
+        ringFx(P_BASE.x, P_BASE.y-4, "rgba(255,215,110,.95)");
+        particles.push({ ring:1, x:P_BASE.x, y:P_BASE.y-4, r:4, vr:3.2, life:1, dec:.026, color:"rgba(255,240,190,.85)", lw:5 });
+        burst(P_BASE.x, P_BASE.y-6, 18, "#ffd76e", 2.4, .9);
+        V.shake = 10; V.cz = 1.14; V.fullflash = .18;
+        floatText(W/2, 168, "VICTORY", "#ffd76e", 46, { big:true });
+        floatText(W/2, 206, "—— 试炼达成 ——", "#fff3c4", 15);
+      },
+      update:t=>{ V.p.sq = .86+.14*t; V.p.zs = 1.08+.02*t; } },
+    // 三段：灵魂汇聚 —— 光珠从敌人余烬飞向玩家，镜头缓退
+    { dur:860, start:()=>{
+        for (let i=0;i<12;i++) particles.push({ x:E_BASE.x-26+Math.random()*52, y:E_BASE.y-40-Math.random()*120,
+          vx:0, vy:0, life:1.5, dec:.005, color:i%2?"#ffd76e":"#fff3c4", r:2+Math.random()*2.4, home:1 });
+        rain(18, "#ffd76e");
+      },
+      update:t=>{
+        V.p.rot = -.1+.045*Math.sin(t*14); V.p.zs = 1.1-.1*Math.min(1,t*2); V.p.sq = 1;
+        V.cz = 1.14-.14*Math.min(1,t*1.4);
+      } },
+  ], () => { resetDepth("e"); resetDepth("p"); showVictory(gain); });
 }
 function playerDie(){
   S.over = true;
