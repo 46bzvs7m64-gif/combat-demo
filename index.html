@@ -1369,20 +1369,63 @@ function playerAct(kind){
     const mult = hasRelic("hunter")?4.0:3.0;
     const d = Math.round(playerAtk()*mult*1.5);
     const L = E_BASE.x-P_BASE.x-70;
+    const OVER = L+46; // 瞬步穿过敌人身侧
+    // 暗能粒子向剑尖聚拢
+    const converge = ()=>{ for (let i=0;i<16;i++){ const a=Math.random()*Math.PI*2, r0=40+Math.random()*38;
+      particles.push({ x:P_BASE.x-6+Math.cos(a)*r0, y:P_BASE.y-72+Math.sin(a)*r0*0.8,
+        vx:-Math.cos(a)*1.7, vy:-Math.sin(a)*1.3, life:.9, dec:.034,
+        color:i%2?"#c792ea":"#8a5cc8", r:1.5+Math.random()*2 }); } };
     runSeq([
-      { dur:300, update:t=>{ V.p.ox = L*t; V.dim = t; V.p.rot = 0.18*Math.sin(t*Math.PI*0.8); V.p.z = 14*Math.sin(t*Math.PI*0.7); V.p.zs = 1+0.08*t; if (Math.random()<.5) afterimages.push({who:'p',ox:V.p.ox,life:1}); } },
-      { dur:170, start:()=>{
+      // 一段：凝滞蓄势 —— 压暗、蹲身、暗能聚拢、敌人倒伏下沉
+      { dur:280, start:()=>{ V.e.sq = .88; V.e.z = -6; },
+        update:t=>{
+          V.p.ox = -8*t; V.p.sq = 1-.18*t; V.p.zs = 1+.06*t; V.p.rot = .1*t; V.p.z = 0;
+          V.dim = .45*t; V.cz = 1+.06*t;
+          V.e.z = -6-4*Math.sin(t*Math.PI);
+          if (Math.random()<.35) converge();
+        } },
+      // 二段：暗影瞬步穿身 —— 高速掠过敌人，密集残影，贯穿瞬间结算
+      { dur:150, start:()=>{
           S.frame += 4; S.stats.execs++;
           E.hp = Math.max(0, E.hp - d); S.stats.dmg += d;
-          floatText(E_BASE.x-10, E_BASE.y-160, `${d}!`, "#c792ea", 34, { big:true });
-          floatText(E_BASE.x-10, E_BASE.y-195, "处决", "#e8d5ff", 15, { big:true });
-          burst(E_BASE.x-20, E_BASE.y-70, 30, "#c792ea", 3.4, 1.2);
-          burst(E_BASE.x-20, E_BASE.y-70, 14, "#ffd76e", 2.4, 1.6);
-          V.shake = 16; V.slash = { show:1, x:E_BASE.x-30, y:E_BASE.y-70, flip:1, cross:1 };
-          V.p.zs = 1.2; V.p.rot = -0.3; V.p.z = 10;
-        }, update:t=>{ V.slash.show = 1-t; V.slash.cross = 1-t; V.p.zs = 1.2-0.12*t; V.p.rot = -0.3+0.3*t; V.p.z = 10*(1-t); } },
-      { dur:360, update:t=>{ V.p.ox = L*(1-t); V.dim = 1-t; V.p.zs = 1.08-0.08*t; V.p.rot = 0; V.slash.show = 0; V.slash.cross = 0; } },
-    ], () => afterPlayerAttack(true));
+          floatText(E_BASE.x-10, E_BASE.y-160, `${d}!`, "#c792ea", 36, { big:true });
+          floatText(E_BASE.x-10, E_BASE.y-198, "处  决", "#e8d5ff", 16, { big:true });
+          burst(E_BASE.x-20, E_BASE.y-70, 34, "#c792ea", 3.6, 1.2);
+          burst(E_BASE.x-20, E_BASE.y-70, 16, "#ffd76e", 2.6, 1.6);
+          ringFx(E_BASE.x-20, E_BASE.y-70, "rgba(199,146,234,.95)");
+          ringFx(E_BASE.x-20, E_BASE.y-70, "rgba(255,255,255,.7)");
+          // 白刃横贯光弧
+          slashTrail.push({ x:E_BASE.x-10, y:E_BASE.y-70, r:66, a0:-.42, a1:.42, color:"#ffffff", life:1 });
+          slashTrail.push({ x:E_BASE.x-10, y:E_BASE.y-64, r:52, a0:-.3, a1:.3, color:"#c792ea", life:.9 });
+          V.slash = { show:1, x:E_BASE.x-30, y:E_BASE.y-70, flip:1, cross:1 };
+          V.shake = 18; V.fullflash = .42; V.hitstop = 130; V.cz = 1.12; V.dim = .5;
+          // 敌人被处决冲击击飞：腾空+翻滚
+          V.e.kb = -46; V.e.z = 24; V.e.sq = .68; V.e.rot = -.38; V.e.zs = 1.1; V.e.flash = 1;
+          // 暗之余烬上升
+          for (let i=0;i<12;i++) particles.push({ x:E_BASE.x-34+Math.random()*54, y:E_BASE.y-40-Math.random()*70,
+            vx:(Math.random()-.5)*.4, vy:-.8-Math.random()*.9, life:1.3, dec:.011, color:"#c792ea", r:1.5+Math.random()*2 });
+        },
+        update:t=>{
+          V.p.ox = -8 + (OVER+8)*t*t;
+          V.p.z = 12*Math.sin(t*Math.PI); V.p.rot = .1-.32*t; V.p.zs = 1.06+.1*t; V.p.sq = .82+.1*t;
+          V.slash.show = 1-t; V.slash.cross = 1-t;
+          afterimages.push({who:'p',ox:V.p.ox,life:1});
+        } },
+      // 三段：贯穿定格 —— 玩家落地收势，敌人击飞回落，画面缓慢回亮
+      { dur:280, update:t=>{
+          V.p.ox = OVER-8-6*t; V.p.z = 12*Math.cos(t*Math.PI/2)*(1-t);
+          V.p.rot = -.22+.1*t; V.p.zs = 1.16-.06*t; V.p.sq = .92+.08*t;
+          V.e.ox = -46+30*t; V.e.z = 24*Math.cos(t*Math.PI/2); V.e.rot = -.38+.45*t; V.e.sq = .68+.2*t; V.e.zs = 1.1-.06*t;
+          V.dim = .5-.12*t;
+        } },
+      // 四段：回身收剑 —— 旋身归位，画面完全回亮
+      { dur:340, update:t=>{
+          V.p.ox = (OVER-14)*(1-t); V.p.rot = -.12+.5*Math.sin(t*Math.PI);
+          V.p.zs = 1.1-.1*t; V.p.sq = 1; V.p.z = 0;
+          V.dim = .38*(1-t);
+          V.e.ox = -16*(1-t); V.e.rot = .07+.07*t; V.e.sq = .88+.12*t; V.e.zs = 1.04-.04*t;
+        } },
+    ], () => { resetDepth("e"); V.dim = 0; afterPlayerAttack(true); });
     return;
   }
   if (kind === "finisher"){
