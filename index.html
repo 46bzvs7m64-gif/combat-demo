@@ -1380,7 +1380,7 @@ function playerAct(kind){
       { dur:280, start:()=>{ V.e.sq = .88; V.e.z = -6; },
         update:t=>{
           V.p.ox = -8*t; V.p.sq = 1-.18*t; V.p.zs = 1+.06*t; V.p.rot = .1*t; V.p.z = 0;
-          V.dim = .45*t; V.cz = 1+.06*t;
+          V.dim = .45*t; V.cz = 1+.12*t;
           V.e.z = -6-4*Math.sin(t*Math.PI);
           if (Math.random()<.35) converge();
         } },
@@ -1398,7 +1398,7 @@ function playerAct(kind){
           slashTrail.push({ x:E_BASE.x-10, y:E_BASE.y-70, r:66, a0:-.42, a1:.42, color:"#ffffff", life:1 });
           slashTrail.push({ x:E_BASE.x-10, y:E_BASE.y-64, r:52, a0:-.3, a1:.3, color:"#c792ea", life:.9 });
           V.slash = { show:1, x:E_BASE.x-30, y:E_BASE.y-70, flip:1, cross:1 };
-          V.shake = 18; V.fullflash = .42; V.hitstop = 130; V.cz = 1.12; V.dim = .5;
+          V.shake = 18; V.fullflash = .42; V.hitstop = 130; V.cz = 1.28; V.dim = .5;
           // 敌人被处决冲击击飞：腾空+翻滚
           V.e.kb = -46; V.e.z = 24; V.e.sq = .68; V.e.rot = -.38; V.e.zs = 1.1; V.e.flash = 1;
           // 暗之余烬上升
