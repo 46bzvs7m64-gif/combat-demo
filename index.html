@@ -69,7 +69,60 @@
   .soul { color:#ffd76e; font-weight:700; }
   .help { text-align:left; font-size:11.5px; color:#9aa; line-height:1.9; margin:10px 0 14px; background:#181828; border-radius:8px; padding:11px 15px; }
   .footer { text-align:center; font-size:11px; color:#666; margin-top:14px; }
-  @media (max-width:820px){ .layout{flex-direction:column;} .side{width:100%;} .choices{grid-template-columns:1fr;} }
+
+  /* ========== 标题画面 ========== */
+  .title-scene { position:relative; border-radius:14px; overflow:hidden; margin:-24px -24px 18px; height:320px;
+    background:linear-gradient(180deg,#1a0a2e 0%,#2d1b4e 35%,#4a2c6e 60%,#6b3f8f 80%,#8b5aaf 100%); }
+  .title-scene::before { content:""; position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 100%, rgba(255,180,80,.4), transparent 70%),
+      radial-gradient(ellipse 80% 30% at 50% 0%, rgba(120,80,200,.5), transparent 70%);
+    animation:titleGlow 4s ease-in-out infinite alternate; }
+  @keyframes titleGlow { from{opacity:.7} to{opacity:1} }
+  /* 远景山/塔轮廓 */
+  .title-mountains { position:absolute; bottom:0; left:0; right:0; height:130px; }
+  .title-mountains svg { width:100%; height:100%; display:block; }
+  /* 回廊拱门 */
+  .title-arch { position:absolute; left:50%; bottom:0; transform:translateX(-50%); width:220px; height:240px; }
+  .title-arch svg { width:100%; height:100%; }
+  /* 飘升粒子 */
+  .ember { position:absolute; width:3px; height:3px; border-radius:50%; background:#ffb86b;
+    box-shadow:0 0 6px #ffb86b,0 0 12px #ff8a3d; opacity:0; animation:rise linear infinite; }
+  @keyframes rise {
+    0% { transform:translateY(0) scale(1); opacity:0; }
+    10% { opacity:.9; }
+    90% { opacity:.6; }
+    100% { transform:translateY(-280px) scale(.4); opacity:0; }
+  }
+  .title-text { position:relative; z-index:5; text-align:center; padding-top:46px; }
+  .title-text .game-title { font-size:44px; font-weight:900; letter-spacing:8px; color:#fff;
+    text-shadow:0 0 20px rgba(255,180,80,.8),0 0 40px rgba(255,120,40,.5),0 2px 4px rgba(0,0,0,.6);
+    animation:titleFloat 3s ease-in-out infinite; }
+  @keyframes titleFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+  .title-text .game-sub { font-size:13px; color:#c9b3ff; letter-spacing:4px; margin-top:10px;
+    text-shadow:0 0 10px rgba(200,160,255,.6); }
+  .title-text .game-sub b { color:#ffd76e; }
+  .title-divider { width:180px; height:1px; margin:14px auto 0;
+    background:linear-gradient(90deg,transparent,#ffd76e,transparent); }
+  /* 标题画面按钮 */
+  .title-btns { position:relative; z-index:5; display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:20px; }
+  .title-btn { width:240px; padding:12px 20px; border-radius:10px; font-size:15px; font-weight:700;
+    cursor:pointer; text-align:center; transition:all .2s; letter-spacing:2px; }
+  .title-btn.primary { background:linear-gradient(135deg,#ff8a3d,#ff5a3d); color:#fff; border:1px solid #ffb86b;
+    box-shadow:0 0 20px rgba(255,120,60,.4); }
+  .title-btn.primary:hover { transform:translateY(-2px); box-shadow:0 4px 28px rgba(255,120,60,.6); }
+  .title-btn.secondary { background:rgba(40,30,60,.7); color:#c9b3ff; border:1px solid #6673ff; }
+  .title-btn.secondary:hover { background:rgba(60,50,90,.9); border-color:#a8b3ff; }
+  .title-help { position:relative; z-index:5; margin-top:18px; text-align:left; font-size:11.5px;
+    color:#b8a8d8; line-height:1.9; background:rgba(10,6,24,.7); border:1px solid #3a2a5a;
+    border-radius:10px; padding:12px 16px; }
+  .title-help b { color:#ffd76e; }
+  .title-help .row { display:flex; gap:6px; }
+  .title-help .row .k { color:#8a7aaa; flex:none; min-width:62px; }
+
+  @media (max-width:820px){ .layout{flex-direction:column;} .side{width:100%;} .choices{grid-template-columns:1fr;}
+    .title-scene{height:280px;margin:-16px -16px 14px;}
+    .title-text .game-title{font-size:32px;letter-spacing:5px;} .title-btn{width:200px;} }
 </style>
 </head>
 <body>
@@ -304,6 +357,30 @@ function glowEyes(x,y,color,gap,w,h){
   cx.shadowBlur=0;
 }
 function belt(x,y,w,c){ cx.fillStyle=OUT; rr(x-w/2,y,w,7,2); cx.fill(); cx.fillStyle=c; rr(x-w/2,y+1,w,4,2); cx.fill(); cx.fillStyle="#e8d5a8"; rr(x-2.5,y+1,5,4,1); cx.fill(); }
+/* 眨眼：每 3.6s 闭 120ms */
+function eyeOpen(){ const m = V.t % 3600; return (m > 3480) ? 0.15 : 1; }
+/* 武器刃面流光（沿刃一道移动高光） */
+function bladeGlint(x0,y0,x1,y1,period){
+  const p = (V.t % period)/period;
+  const gx = x0 + (x1-x0)*p, gy = y0 + (y1-y0)*p;
+  cx.save();
+  cx.strokeStyle="rgba(255,255,255,.85)"; cx.lineWidth=1.6; cx.lineCap="round";
+  cx.beginPath(); cx.moveTo(gx-3,gy); cx.lineTo(gx+3,gy-6); cx.stroke();
+  cx.restore();
+}
+/* 呼吸缩放（肩/胸起伏） */
+const breathe = (amp=1,spd=620) => 1 + Math.sin(V.t/spd)*0.018*amp;
+/* 小环境粒子（在敌人周围缓缓上浮） */
+function ambientMotes(n, x, y, w, h, color){
+  for(let i=0;i<n;i++){
+    const seed = i*137.5;
+    const px = x - w/2 + ((seed*31 % w) + V.t/55) % w;
+    const py = y - ((V.t/50 + seed*17) % h);
+    cx.globalAlpha = 0.2 + 0.25*Math.sin(V.t/400+seed);
+    cx.fillStyle = color; cx.beginPath(); cx.arc(px, py, 1.3, 0, 7); cx.fill();
+  }
+  cx.globalAlpha = 1;
+}
 
 /* ===== 玩家：兜帽剑士（描边+渐变胸甲+披风+金格长剑） ===== */
 function drawPlayer(x,y){
@@ -343,7 +420,7 @@ function drawPlayerBody(x,y){
   cx.fillStyle=fc("#26304e",f); cx.beginPath(); cx.arc(x,y-88,13.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.stroke();
   cx.fillStyle=fc("#d8a984",f); cx.beginPath(); cx.arc(x+1,y-86,8.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.3; cx.stroke();
   cx.fillStyle=OUT; cx.beginPath(); cx.arc(x,y-88,12.8,Math.PI*0.92,Math.PI*2.08); cx.fill();
-  cx.fillStyle="#7fd8ff"; cx.shadowColor="#7fd8ff"; cx.shadowBlur=6; rr(x+3,y-89,5,3,1.5); cx.fill(); cx.shadowBlur=0;
+  cx.fillStyle="#7fd8ff"; cx.shadowColor="#7fd8ff"; cx.shadowBlur=6; rr(x+3,y-89,5,3*eyeOpen(),1.5); cx.fill(); cx.shadowBlur=0;
   // 前臂+长剑（金格蓝刃）
   const armSwing = Math.sin(V.t/480)*0.05;
   limb(x+12,y-70,x+19,y-44,"#3a4a72",6);
@@ -352,7 +429,18 @@ function drawPlayerBody(x,y){
   cx.fillStyle="#c9a35c"; rr(-9,-4,18,5,2); cx.fill();
   const bg=cx.createLinearGradient(-3,-70,3,-70); bg.addColorStop(0,"#8ea0c8"); bg.addColorStop(.5,"#f2f6ff"); bg.addColorStop(1,"#8ea0c8");
   cx.fillStyle=fc(bg,f); poly([-3,-4, 3,-4, 2,-72, 0,-78, -2,-72]);
+  bladeGlint(-1,-12, 1,-68, 2200);
   cx.restore();
+  // 腰挂药水瓶×2
+  [-7, 7].forEach((hx,i)=>{
+    const sw = Math.sin(V.t/700+i)*1.2;
+    cx.strokeStyle="#3a2c18"; cx.lineWidth=1.4; cx.beginPath(); cx.moveTo(x+hx,y-31); cx.lineTo(x+hx+sw,y-25); cx.stroke();
+    cx.fillStyle=i?"#7fd8a0":"#ff8a6a"; cx.save(); cx.translate(x+hx+sw,y-21);
+    rr(-2.6,-5,5.2,9,2); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=.8; cx.stroke();
+    cx.fillStyle="rgba(255,255,255,.5)"; rr(-1.8,-3.5,1.4,3,1); cx.fill();
+    cx.fillStyle="#5a4a2a"; rr(-1.6,-7,3.2,2.4,1); cx.fill();
+    cx.restore();
+  });
 }
 function poly2(){ /* 披风内阴影（无描边三角） */
   cx.beginPath(); cx.moveTo(arguments[0],arguments[1]);
@@ -410,13 +498,20 @@ function dGuard(x,y,f){
   cx.fillStyle=fc(vgrad(y-72,y-36,"#5e6b8c","#39425c"),f);
   poly([x-30,y-72, x-14,y-72, x-14,y-42, x-22,y-32, x-30,y-42]);
   cx.fillStyle="#c9a35c"; cx.beginPath(); cx.arc(x-22,y-54,3,0,7); cx.fill();
+  cx.strokeStyle="#c9a35c"; cx.lineWidth=1.6;
+  cx.beginPath(); cx.moveTo(x-22,y-65); cx.lineTo(x-22,y-43); cx.moveTo(x-27,y-54); cx.lineTo(x-17,y-54); cx.stroke();
   // 武装剑
   cx.save(); cx.translate(x+22,y-44); cx.rotate(-0.34);
   cx.fillStyle="#3a2c18"; cx.fillRect(-2,0,4,9);
   cx.fillStyle="#c9a35c"; rr(-8,-4,16,4.5,2); cx.fill();
   const bg=cx.createLinearGradient(-2.5,-72,2.5,-72); bg.addColorStop(0,"#9aa6c4"); bg.addColorStop(.5,"#f4f8ff"); bg.addColorStop(1,"#9aa6c4");
   cx.fillStyle=fc(bg,f); poly([-2.5,-4, 2.5,-4, 1.6,-68, 0,-74, -1.6,-68]);
+  bladeGlint(-1,-10, 1,-64, 2600);
   cx.restore();
+  // 胸甲高光线
+  cx.strokeStyle="rgba(220,228,255,.35)"; cx.lineWidth=1.2;
+  cx.beginPath(); cx.moveTo(x-14,y-78); cx.lineTo(x-11,y-40); cx.stroke();
+  ambientMotes(4, x-22, y-20, 60, 90, "#9fb0d8");
 }
 
 /* 2) 血狂战士：赤膊毛皮 · 双角盔 · 战斧 */
@@ -428,6 +523,11 @@ function dBerserker(x,y,f){
   for(let i=0;i<5;i++){ cx.beginPath(); cx.moveTo(x-15+i*7.5,y-30); cx.lineTo(x-12+i*7.5,y-14); cx.lineTo(x-9+i*7.5,y-30); cx.fill(); }
   // 赤膊（皮肤渐变）+皮束带
   poly([x-16,y-80, x+16,y-80, x+13,y-34, x-13,y-34], fc(vgrad(y-80,y-34,"#d29874","#a86848"),f));
+  // 胸肌阴影 + 战纹
+  cx.strokeStyle="rgba(90,50,28,.55)"; cx.lineWidth=1.4;
+  cx.beginPath(); cx.moveTo(x,y-74); cx.lineTo(x,y-56); cx.moveTo(x-11,y-64); cx.quadraticCurveTo(x-6,y-58,x,y-60); cx.moveTo(x+11,y-64); cx.quadraticCurveTo(x+6,y-58,x,y-60); cx.stroke();
+  cx.strokeStyle="#7a2a1e"; cx.lineWidth=2;
+  cx.beginPath(); cx.moveTo(x-9,y-70); cx.lineTo(x-5,y-66); cx.moveTo(x+9,y-70); cx.lineTo(x+5,y-66); cx.stroke();
   cx.fillStyle="#5a3620"; poly([x-16,y-80, x-4,y-80, x-7,y-34, x-13,y-34]);
   cx.fillStyle="#3a2414"; rr(x-13,y-52,26,6,2); cx.fill();
   cx.fillStyle="#c9a35c"; cx.fillRect(x-3,y-52,6,6);
@@ -446,7 +546,9 @@ function dBerserker(x,y,f){
   cx.strokeStyle=OUT; cx.lineWidth=7; cx.beginPath(); cx.moveTo(0,8); cx.lineTo(0,-46); cx.stroke();
   cx.strokeStyle="#5a3620"; cx.lineWidth=4.5; cx.beginPath(); cx.moveTo(0,8); cx.lineTo(0,-46); cx.stroke();
   cx.fillStyle=fc("#c4ccdc",f); poly([0,-52, 26,-46, 22,-30, 6,-34, 0,-38]);
+  cx.fillStyle="rgba(255,255,255,.7)"; cx.fillRect(8,-50,3,10);
   cx.restore();
+  ambientMotes(5, x, y-16, 56, 96, "#e8b06a");
 }
 
 /* 3) 咒术师：尖帽长袍 · 苍白面具 · 浮空宝珠法杖 */
@@ -474,6 +576,12 @@ function dSorcerer(x,y,f){
   const og=cx.createRadialGradient(x-27,orbY,1,x-27,orbY,11);
   og.addColorStop(0,"#f0d8ff"); og.addColorStop(.5,"#b87aff"); og.addColorStop(1,"rgba(120,60,200,0)");
   cx.fillStyle=og; cx.beginPath(); cx.arc(x-27,orbY,11,0,7); cx.fill();
+  // 宝珠卫星光点
+  for(let i=0;i<3;i++){
+    const a = V.t/420 + i*Math.PI*2/3;
+    cx.fillStyle="#e8d5ff"; cx.beginPath(); cx.arc(x-27+Math.cos(a)*17, orbY+Math.sin(a)*17, 1.8, 0, 7); cx.fill();
+  }
+  ambientMotes(6, x, y-14, 64, 104, "#c792ea");
 }
 
 /* 4) 碎铠屠夫：壮硕 · 血污围裙 · 半铁面 · 巨型菜刀 */
@@ -501,6 +609,16 @@ function dButcher(x,y,f){
   cx.fillStyle=fc(cg,f); poly([-4,-4, 30,-4, 30,-32, 10,-36, -4,-28]);
   cx.fillStyle="#707a8a"; cx.fillRect(-4,-10,34,2.5);
   cx.restore();
+  // 围裙血滴（循环坠落）
+  for(let i=0;i<3;i++){
+    const ph = (V.t/900 + i/3) % 1;
+    const dx = x-8+i*8, dy = y-20 + ph*26;
+    cx.fillStyle=`rgba(168,40,40,${0.8*(1-ph)})`;
+    cx.beginPath(); cx.ellipse(dx, dy, 1.8, 2.8, 0, 0, 7); cx.fill();
+  }
+  // 半铁面铆钉
+  cx.fillStyle="#8a909c"; [[x-10,y-94],[x-10,y-88],[x,y-98]].forEach(([rx,ry])=>{ cx.beginPath(); cx.arc(rx,ry,1.1,0,7); cx.fill(); });
+  ambientMotes(4, x, y-16, 66, 96, "#d08060");
 }
 
 /* 5) 回廊之主：黑金国王 · 王冠破披风 · 双手大剑 */
@@ -518,12 +636,21 @@ function dLord(x,y,f){
   cx.fillStyle="#140e1e"; rr(x-9,y-96,18,5,2); cx.fill();
   glowEyes(x,y-95,"#ff5a7a",10,5,3);
   cx.fillStyle="#ffd76e"; poly([x-13,y-104, x-13,y-115, x-7,y-107, x-1,y-118, x+5,y-107, x+11,y-115, x+11,y-104]);
+  // 王冠中央红宝石脉冲
+  const gp = 0.6+0.4*Math.sin(V.t/300);
+  cx.fillStyle=`rgba(255,60,90,${gp})`; cx.shadowColor="#ff3a5a"; cx.shadowBlur=8;
+  cx.beginPath(); cx.arc(x,y-109,3,0,7); cx.fill(); cx.shadowBlur=0;
   cx.save(); cx.translate(x+26,y-46); cx.rotate(-0.18);
   const lg=cx.createLinearGradient(-4,0,4,0); lg.addColorStop(0,"#8a7aa8"); lg.addColorStop(.5,"#f4f8ff"); lg.addColorStop(1,"#8a7aa8");
   cx.fillStyle=fc(lg,f); poly([-4,-2, 4,-2, 3,-96, 0,-104, -3,-96]);
+  bladeGlint(-2,-12, 2,-92, 3000);
   cx.fillStyle="#ffd76e"; rr(-13,-6,26,6,2); cx.fill();
   cx.fillStyle="#2a1c10"; cx.fillRect(-3,0,6,12);
   cx.restore();
+  // 披风金边
+  cx.strokeStyle="rgba(255,215,110,.4)"; cx.lineWidth=1.4;
+  cx.beginPath(); cx.moveTo(x-4+sway*0.6,y-94); cx.lineTo(x-40+sway,y-62); cx.lineTo(x-30+sway,y-6); cx.stroke();
+  ambientMotes(6, x-8, y-16, 80, 108, "#b392e8");
 }
 
 /* 6) 血牙领主：高领猩红披风 · 苍白贵族 · 细剑+红宝石 */
@@ -551,7 +678,13 @@ function dBloodfang(x,y,f){
   cx.fillStyle="#c9a35c"; rr(-7,-3,14,3.5,1.5); cx.fill();
   const rg=cx.createLinearGradient(-1.5,-90,1.5,-90); rg.addColorStop(0,"#aab4cc"); rg.addColorStop(.5,"#ffffff"); rg.addColorStop(1,"#aab4cc");
   cx.fillStyle=fc(rg,f); cx.fillRect(-1.2,-3,2.4,-88);
+  bladeGlint(-1,-10, 1,-82, 2400);
   cx.restore();
+  // 披风外沿血光
+  cx.strokeStyle=`rgba(255,60,90,${0.3+0.2*Math.sin(V.t/500)})`; cx.lineWidth=1.4;
+  cx.beginPath(); cx.moveTo(x-34+sway,y-66); cx.quadraticCurveTo(x-30+sway,y-30,x-26+sway,y-4); cx.stroke();
+  cx.beginPath(); cx.moveTo(x+34+sway,y-66); cx.quadraticCurveTo(x+30+sway,y-30,x+26+sway,y-4); cx.stroke();
+  ambientMotes(7, x, y-14, 72, 106, "#ff5a7a");
 }
 
 /* 7) 虚空咒师：星纹深蓝袍 · 鹿角冠 · 旋转符文环 */
@@ -583,6 +716,14 @@ function dVoidmage(x,y,f){
   const og=cx.createRadialGradient(x-26,y-84,1,x-26,y-84,11);
   og.addColorStop(0,"#d8ecff"); og.addColorStop(.5,"#5a9cff"); og.addColorStop(1,"rgba(40,90,200,0)");
   cx.fillStyle=og; cx.beginPath(); cx.arc(x-26,y-84+Math.sin(V.t/200)*3,11,0,7); cx.fill();
+  // 符文环端头光点
+  [[0,Math.PI*1.3],[Math.PI,Math.PI+Math.PI*0.9]].forEach(([a0,a1])=>{
+    cx.fillStyle="#b8d8ff"; cx.beginPath(); cx.arc(x+22+Math.cos(a1)*13, y-52+Math.sin(a1)*13, 2.2, 0, 7); cx.fill();
+  });
+  // 鹿角小分叉
+  cx.strokeStyle=fc("#9ab3e0",f); cx.lineWidth=1.6;
+  [-1,1].forEach(s=>{ cx.beginPath(); cx.moveTo(x+s*15,y-114); cx.lineTo(x+s*20,y-120); cx.stroke(); });
+  ambientMotes(8, x, y-14, 70, 108, "#8ab8ff");
 }
 
 /* 8) 磐岩傀儡：方块岩石躯 · 翠晶裂缝 · 巨锤拳 */
@@ -609,6 +750,11 @@ function dGolem(x,y,f){
   cx.fillStyle="#7dffb8"; cx.shadowColor="#3aff9c"; cx.shadowBlur=7; rr(x-7,y-98,14,3.5,1.5); cx.fill(); cx.shadowBlur=0;
   cx.fillStyle=fc("#5a584a",f); cx.beginPath(); cx.moveTo(x-9,y-104); cx.lineTo(x-6,y-112); cx.lineTo(x-3,y-104); cx.fill();
   cx.beginPath(); cx.moveTo(x+9,y-104); cx.lineTo(x+6,y-112); cx.lineTo(x+3,y-104); cx.fill();
+  // 翠晶能量溢出粒子
+  ambientMotes(7, x, y-18, 72, 110, "#7dffb8");
+  // 石拳小裂纹
+  cx.strokeStyle="#3aff9c"; cx.lineWidth=1.4; cx.shadowColor="#3aff9c"; cx.shadowBlur=4;
+  cx.beginPath(); cx.moveTo(x+28,y-50); cx.lineTo(x+32,y-42); cx.stroke(); cx.shadowBlur=0;
 }
 
 /* 9) 影刃刺客：前倾紧身 · 长围巾 · 双匕首 */
@@ -632,17 +778,30 @@ function dShadow(x,y,f){
     cx.fillStyle="#6a5a8a"; rr(-5,-3,10,3,1.5); cx.fill();
     const dg=cx.createLinearGradient(-2,-46,2,-46); dg.addColorStop(0,"#8a7cb8"); dg.addColorStop(.5,"#e8e0ff"); dg.addColorStop(1,"#8a7cb8");
     cx.fillStyle=fc(dg,f); poly([-2,-3, 2,-3, 1.4,-42, 0,-48, -1.4,-42]);
+    cx.strokeStyle="rgba(230,220,255,.8)"; cx.lineWidth=1;
+    cx.beginPath(); cx.moveTo(-1,-10); cx.lineTo(0,-38); cx.stroke();
     cx.restore();
   });
+  // 第二条短飘带
+  poly([x-2+lean,y-80, x-30+Math.sin(V.t/300)*7,y-72, x-26+Math.sin(V.t/260)*9,y-58, x-4+lean,y-58], fc("#5a3f8e",f));
+  ambientMotes(7, x-2, y-16, 60, 100, "#c792ea");
 }
 
 /* 10) 回廊之心：四阶段 · 心核茧+四浮游刃+王冠人影 */
 function dHeart(x,y,f){
   const ph = E.phase||1;
-  // 四把浮游刃环绕
+  // 四把浮游刃环绕（带拖尾）
   for(let i=0;i<4;i++){
     const a = V.t/500 + i*Math.PI/2 + (ph>=3?V.t/180:0);
     const bx = x + Math.cos(a)*58, by = y-64 + Math.sin(a)*30;
+    // 拖尾
+    for(let k=1;k<=3;k++){
+      const ta = a - k*0.16*(ph>=3?2:1);
+      const tx = x + Math.cos(ta)*(58-k*5), ty = y-64 + Math.sin(ta)*(30-k*3);
+      cx.globalAlpha = 0.25 - k*0.06;
+      cx.fillStyle="#b8a8d8"; cx.beginPath(); cx.arc(tx,ty,5-k,0,7); cx.fill();
+    }
+    cx.globalAlpha = 1;
     cx.save(); cx.translate(bx,by); cx.rotate(a+Math.PI/2);
     cx.fillStyle=fc("#b8a8d8",f); poly([0,-12, 4,0, 0,12, -4,0]);
     cx.fillStyle="#ff5a7a"; cx.beginPath(); cx.arc(0,0,2,0,7); cx.fill();
@@ -668,6 +827,8 @@ function dHeart(x,y,f){
   poly([x-9,y-58, x+9,y-58, x+7,y-34, x-7,y-34]);
   cx.fillStyle="#ffd76e"; poly([x-8,y-72, x-8,y-79, x-4,y-73, x,y-81, x+4,y-73, x+8,y-79, x+8,y-72]);
   glowEyes(x,y-67,"#ff5a7a",7,3,2.2);
+  // 心核能量尘（阶段越高越多）
+  ambientMotes(5+ph*2, x, y-14, 96, 120, ph>=3?"#ff8aa8":"#e8a8c8");
 }
 
 /* ---- 头顶条 + 意图预告 ---- */
@@ -1361,20 +1522,69 @@ function hideOverlay(){ overlay.classList.remove("show"); ovPanel.className = "o
 
 function showMenu(){
   const saved = loadGame();
+  // 生成飘升粒子
+  const embers = Array.from({length:22},(_,i)=>{
+    const left = 8 + Math.random()*84;
+    const dur = 3 + Math.random()*4;
+    const delay = Math.random()*6;
+    const size = 2 + Math.random()*3;
+    return `<div class="ember" style="left:${left}%;bottom:${Math.random()*40}%;width:${size}px;height:${size}px;animation-duration:${dur}s;animation-delay:${delay}s"></div>`;
+  }).join("");
   showOverlay(`
-    <h3>试炼回廊</h3>
-    <div class="sub">深入十层回廊，每层守关者各有独门杀技：碎铠、吸血、闪现、反伤、迅捷……<br>击败第十层的「回廊之心」，回廊将无限延伸——且越来越深、越来越险。<br>死亡不会清空成长：魂与遗物永久保留，从倒下的那层继续。</div>
-    <div class="help">
-      · <b style="color:#ffd76e">意图预告</b>：敌人头顶会预告下回合行动——攻击/蓄力/防御/特殊，据此决策<br>
-      · 敌人防御回合：受伤 -50%、削韧减半——适合用药剂、叠加异常或攒连击<br>
-      · 回合制：你先手。轻击=火（双段斩），重击=雷（跳劈），处决系=暗<br>
-      · 削韧：打空韧性槽敌人倒地 1 回合，可处决（3× 无视防御）<br>
-      · 站位：前压命中+15% 受伤+20% / 后撤命中-10% 受伤-20%<br>
-      · 每层通关：回廊之魂 + 遗物三选一；魂可加点攻击/生命/体力/药剂
+    <div class="title-scene">
+      ${embers}
+      <!-- 远景山脉 -->
+      <div class="title-mountains">
+        <svg viewBox="0 0 600 130" preserveAspectRatio="none">
+          <polygon points="0,130 80,70 140,100 210,50 290,90 360,40 440,85 520,55 600,100 600,130" fill="#1a0f33" opacity=".8"/>
+          <polygon points="0,130 60,90 130,110 200,75 280,105 350,70 430,100 510,80 600,110 600,130" fill="#0f0820" opacity=".9"/>
+        </svg>
+      </div>
+      <!-- 回廊拱门 -->
+      <div class="title-arch">
+        <svg viewBox="0 0 220 240">
+          <defs>
+            <linearGradient id="archGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#5a3a8a"/>
+              <stop offset="1" stop-color="#2a1650"/>
+            </linearGradient>
+            <radialGradient id="archGlow" cx="50%" cy="60%" r="50%">
+              <stop offset="0" stop-color="#ff8a3d" stop-opacity=".6"/>
+              <stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <!-- 拱门主体 -->
+          <path d="M 30 240 L 30 90 Q 30 20 110 20 Q 190 20 190 90 L 190 240 Z" fill="url(#archGrad)" stroke="#8a5abf" stroke-width="2"/>
+          <!-- 门洞 -->
+          <path d="M 50 240 L 50 95 Q 50 35 110 35 Q 170 35 170 95 L 170 240 Z" fill="#0a0518"/>
+          <!-- 门内光 -->
+          <ellipse cx="110" cy="150" rx="55" ry="70" fill="url(#archGlow)"/>
+          <!-- 拱顶装饰 -->
+          <circle cx="110" cy="20" r="6" fill="#ffd76e"/>
+          <path d="M 60 85 Q 110 55 160 85" fill="none" stroke="#ffd76e" stroke-width="1.5" opacity=".7"/>
+        </svg>
+      </div>
+      <!-- 标题文字 -->
+      <div class="title-text">
+        <div class="game-title">试炼回廊</div>
+        <div class="game-sub">TRIAL <b>·</b> CORRIDOR</div>
+        <div class="title-divider"></div>
+      </div>
     </div>
-    <button class="ovbtn" onclick="newRun()">开始新的远征</button>
-    ${saved && saved.floor ? `<button class="ovbtn gray" onclick="continueRun()">继续远征（第 ${saved.floor} 层）</button>` : ""}
-  `);
+
+    <div class="title-btns">
+      <button class="title-btn primary" onclick="newRun()">⚔ 开始新的远征</button>
+      ${saved && saved.floor ? `<button class="title-btn secondary" onclick="continueRun()">继续远征（第 ${saved.floor} 层 · ${saved.souls||0} 魂）</button>` : ""}
+    </div>
+
+    <div class="title-help">
+      <div class="row"><span class="k">意图预告</span><span>敌人头顶预告下回合行动——攻击/蓄力/防御/特殊，据此决策</span></div>
+      <div class="row"><span class="k">削韧处决</span><span>打空韧性槽敌人倒地 1 回合，可<b>处决</b>（3× 无视防御）</span></div>
+      <div class="row"><span class="k">站位</span><span>前压命中+15% 受伤+20% / 后撤命中-10% 受伤-20%</span></div>
+      <div class="row"><span class="k">元素</span><span>轻击=火（双段），重击=雷（跳劈），处决=暗</span></div>
+      <div class="row"><span class="k">成长</span><span>每层通关：回廊之魂 + 遗物三选一；魂可永久加点</span></div>
+    </div>
+  `, "");
 }
 function newRun(){
   meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0, combo:0, stance:"neutral" };
