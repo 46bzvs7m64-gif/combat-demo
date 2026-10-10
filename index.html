@@ -267,8 +267,9 @@ const cv = document.getElementById("cv"); let cx = cv.getContext("2d");
 const W = cv.width, H = cv.height;
 const P_BASE = { x:225, y:318 }, E_BASE = { x:735, y:318 };
 const V = {
-  p:{ ox:0, oy:0, flash:0, ghost:0, block:0, visible:1, kb:0, z:0, zs:1, rot:0, sq:1 },
-  e:{ ox:0, flash:0, visible:1, aura:0, charge:0, kb:0, telegraph:0, z:0, zs:1, rot:0, sq:1 },
+  p:{ ox:0, oy:0, flash:0, ghost:0, block:0, visible:1, kb:0, z:0, zs:1, rot:0, sq:1,
+      sw:0, ba:0, lf:0, lb:0, lfl:0, lbl:0, cr:0, ln:0 },
+  e:{ ox:0, flash:0, visible:1, aura:0, charge:0, kb:0, telegraph:0, z:0, zs:1, rot:0, sq:1, ln:0 },
   slash:{ show:0, x:0, y:0, flip:1, cross:0, angle:0, rad:46 },
   ring:{ show:0, x:0, y:0, r:0 },
   proj:{ show:0, x:0, y:0, r:6 },
@@ -331,7 +332,8 @@ function depthShadow(x,y,w,z){
 }
 /* 动作序列之间把伪3D姿态归零 */
 function resetDepth(who){
-  (who==="p"?[V.p]:who==="e"?[V.e]:[V.p,V.e]).forEach(o=>{ o.z=0; o.zs=1; o.rot=0; o.sq=1; });
+  (who==="p"?[V.p]:who==="e"?[V.e]:[V.p,V.e]).forEach(o=>{ o.z=0; o.zs=1; o.rot=0; o.sq=1; o.ln=0; });
+  if (who!=="e") [V.p].forEach(o=>{ o.sw=0; o.ba=0; o.lf=0; o.lb=0; o.lfl=0; o.lbl=0; o.cr=0; });
 }
 const fc = (c,f) => f>0.05 ? "#f4f4ff" : c;
 function vgrad(y0,y1,c0,c1){ const g=cx.createLinearGradient(0,y0,0,y1); g.addColorStop(0,c0); g.addColorStop(1,c1); return g; }
@@ -405,33 +407,48 @@ function drawPlayer(x,y){
   }
   cx.restore();
 }
+/* 点 (px,py) 绕关节 o 旋转 a 弧度 */
+function rot2(o,px,py,a){ const dx=px-o.x, dy=py-o.y, c=Math.cos(a), s=Math.sin(a);
+  return { x:o.x+dx*c-dy*s, y:o.y+dx*s+dy*c }; }
 function drawPlayerBody(x,y){
   const f = V.p.flash;
   const sway = Math.sin(V.t/300)*4;
+  // 肢体姿态通道：sw 挥剑臂 / ba 副臂 / lf·lb 双脚跨步 / lfl·lbl 抬脚 / cr 蹲身 / ln 前倾(正=向前)
+  const PS = V.p;
+  const pSw = PS.sw||0, pBa = PS.ba||0, pLf = PS.lf||0, pLb = PS.lb||0;
+  const pLfl = PS.lfl||0, pLbl = PS.lbl||0, cr = PS.cr||0, ln = PS.ln||0;
+  // 躯干前倾：以脚底为轴剪切上躯干（正=朝敌方）
+  if (ln){ cx.save(); cx.translate(x,y); cx.transform(1,0,-ln,1,0,0); cx.translate(-x,-y); }
   // 披风
-  poly([x-3,y-90, x-31+sway,y-58, x-21+sway,y-6, x-3,y-12, x+2,y-60], fc("#222b48",f));
-  cx.fillStyle = "#181f38"; poly2(x-3,y-90,x-31+sway,y-58,x-21+sway,y-6);
-  // 腿+靴
-  limb(x-6,y-32,x-10,y-6,"#2c3550",7); limb(x+7,y-32,x+11,y-6,"#2c3550",7);
-  cx.fillStyle=fc("#141828",f); rr(x-15,y-9,10,8,3); cx.fill(); rr(x+5,y-9,10,8,3); cx.fill();
-  // 后臂
-  limb(x-10,y-72,x-16,y-40,"#33405f",6);
+  poly([x-3,y-90-cr, x-31+sway,y-58-cr, x-21+sway,y-6, x-3,y-12, x+2,y-60-cr], fc("#222b48",f));
+  cx.fillStyle = "#181f38"; poly2(x-3,y-90-cr,x-31+sway,y-58-cr,x-21+sway,y-6);
+  // 腿+靴（髋部随蹲身下沉，双脚跨步/抬离 —— 走出真实步态）
+  limb(x-6,y-32-cr, x-10+pLf, y-6-pLfl, "#2c3550",7);
+  limb(x+7,y-32-cr, x+11+pLb, y-6-pLbl, "#2c3550",7);
+  cx.fillStyle=fc("#141828",f); rr(x-15+pLf,y-9-pLfl,10,8,3); cx.fill(); rr(x+5+pLb,y-9-pLbl,10,8,3); cx.fill();
+  // 后臂（绕肩关节 x-10,y-72-cr 摆动）
+  const baS = { x:x-10, y:y-72-cr };
+  const baE = rot2(baS, x-16, y-40-cr, pBa*1.1);
+  limb(baS.x,baS.y, baE.x,baE.y,"#33405f",6);
   // 躯干胸甲
-  poly([x-15,y-78, x+15,y-78, x+12,y-32, x-12,y-32], fc(vgrad(y-78,y-32,"#4d6094","#2b365c"),f));
-  cx.fillStyle=fc("#6b7db4",f); rr(x-4,y-70,8,22,3); cx.fill();      // 中脊
-  cx.fillStyle="#c9a35c"; cx.beginPath(); cx.arc(x,y-58,3.2,0,7); cx.fill(); // 金扣
-  belt(x,y-38,30);
+  poly([x-15,y-78-cr, x+15,y-78-cr, x+12,y-32-cr, x-12,y-32-cr], fc(vgrad(y-78-cr,y-32-cr,"#4d6094","#2b365c"),f));
+  cx.fillStyle=fc("#6b7db4",f); rr(x-4,y-70-cr,8,22,3); cx.fill();      // 中脊
+  cx.fillStyle="#c9a35c"; cx.beginPath(); cx.arc(x,y-58-cr,3.2,0,7); cx.fill(); // 金扣
+  belt(x,y-38-cr,30);
   // 肩甲
-  pauldron(x+15,y-74,fc("#54648f",f),7); pauldron(x-15,y-74,fc("#46547e",f),6);
+  pauldron(x+15,y-74-cr,fc("#54648f",f),7); pauldron(x-15,y-74-cr,fc("#46547e",f),6);
   // 头：兜帽+脸+护额
-  cx.fillStyle=fc("#26304e",f); cx.beginPath(); cx.arc(x,y-88,13.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.stroke();
-  cx.fillStyle=fc("#d8a984",f); cx.beginPath(); cx.arc(x+1,y-86,8.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.3; cx.stroke();
-  cx.fillStyle=OUT; cx.beginPath(); cx.arc(x,y-88,12.8,Math.PI*0.92,Math.PI*2.08); cx.fill();
-  cx.fillStyle="#7fd8ff"; cx.shadowColor="#7fd8ff"; cx.shadowBlur=6; rr(x+3,y-89,5,3*eyeOpen(),1.5); cx.fill(); cx.shadowBlur=0;
-  // 前臂+长剑（金格蓝刃）
+  cx.fillStyle=fc("#26304e",f); cx.beginPath(); cx.arc(x,y-88-cr,13.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.stroke();
+  cx.fillStyle=fc("#d8a984",f); cx.beginPath(); cx.arc(x+1,y-86-cr,8.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.3; cx.stroke();
+  cx.fillStyle=OUT; cx.beginPath(); cx.arc(x,y-88-cr,12.8,Math.PI*0.92,Math.PI*2.08); cx.fill();
+  cx.fillStyle="#7fd8ff"; cx.shadowColor="#7fd8ff"; cx.shadowBlur=6; rr(x+3,y-89-cr,5,3*eyeOpen(),1.5); cx.fill(); cx.shadowBlur=0;
+  // 前臂+长剑（金格蓝刃）：绕肩关节 x+12,y-70-cr 挥摆，剑随手腕联动
   const armSwing = Math.sin(V.t/480)*0.05;
-  limb(x+12,y-70,x+19,y-44,"#3a4a72",6);
-  cx.save(); cx.translate(x+20,y-44); cx.rotate(-0.42+armSwing);
+  const shF = { x:x+12, y:y-70-cr };
+  const swa = -pSw*0.9;
+  const hd = rot2(shF, x+19, y-44-cr, swa);
+  limb(shF.x,shF.y, hd.x,hd.y,"#3a4a72",6);
+  cx.save(); cx.translate(hd.x+1,hd.y); cx.rotate(-0.42+armSwing + pSw*1.55);
   cx.fillStyle="#3a2c18"; cx.fillRect(-2,0,4,10);
   cx.fillStyle="#c9a35c"; rr(-9,-4,18,5,2); cx.fill();
   const bg=cx.createLinearGradient(-3,-70,3,-70); bg.addColorStop(0,"#8ea0c8"); bg.addColorStop(.5,"#f2f6ff"); bg.addColorStop(1,"#8ea0c8");
@@ -440,14 +457,15 @@ function drawPlayerBody(x,y){
   cx.restore();
   // 腰挂药水瓶×2
   [-7, 7].forEach((hx,i)=>{
-    const sw = Math.sin(V.t/700+i)*1.2;
-    cx.strokeStyle="#3a2c18"; cx.lineWidth=1.4; cx.beginPath(); cx.moveTo(x+hx,y-31); cx.lineTo(x+hx+sw,y-25); cx.stroke();
-    cx.fillStyle=i?"#7fd8a0":"#ff8a6a"; cx.save(); cx.translate(x+hx+sw,y-21);
+    const swp = Math.sin(V.t/700+i)*1.2;
+    cx.strokeStyle="#3a2c18"; cx.lineWidth=1.4; cx.beginPath(); cx.moveTo(x+hx,y-31-cr); cx.lineTo(x+hx+swp,y-25-cr); cx.stroke();
+    cx.fillStyle=i?"#7fd8a0":"#ff8a6a"; cx.save(); cx.translate(x+hx+swp,y-21-cr);
     rr(-2.6,-5,5.2,9,2); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=.8; cx.stroke();
     cx.fillStyle="rgba(255,255,255,.5)"; rr(-1.8,-3.5,1.4,3,1); cx.fill();
     cx.fillStyle="#5a4a2a"; rr(-1.6,-7,3.2,2.4,1); cx.fill();
     cx.restore();
   });
+  if (ln) cx.restore();
 }
 function poly2(){ /* 披风内阴影（无描边三角） */
   cx.beginPath(); cx.moveTo(arguments[0],arguments[1]);
@@ -472,7 +490,9 @@ function drawEnemy(x,y){
     cx.fillStyle = ag; cx.beginPath(); cx.arc(x,y-70,115,0,7); cx.fill();
   }
   const sc = ENEMY_SCALE[E.type] || 1.05;
-  cx.translate(x,y); cx.scale(sc*zs, sc*zs*sq); cx.rotate(st0.rot||0); cx.translate(-x,-y);
+  cx.translate(x,y); cx.scale(sc*zs, sc*zs*sq); cx.rotate(st0.rot||0);
+  if (st0.ln) cx.transform(1,0,st0.ln,1,0,0); // 躯干前倾（正=朝玩家方向压身）
+  cx.translate(-x,-y);
   (ENEMY_DRAW[E.type] || dGuard)(x, y, V.e.flash);
   if (V.e.charge > 0.03){
     const oy = y-124, r = 6+V.e.charge*17;
@@ -1130,6 +1150,10 @@ function loop(ts){
   if (V.dim > 0.01){ cx.fillStyle = `rgba(10,4,20,${V.dim*0.6})`; cx.fillRect(0,0,W,H); }
   if (V.fullflash > 0.01){ cx.fillStyle = `rgba(255,250,230,${V.fullflash*0.8})`; cx.fillRect(0,0,W,H); }
   particles = particles.filter(p => p.life > 0);
+  // 肢体姿态回弹（动作结束后平滑归位；hitstop 时 dt=0 自动冻结）
+  { const rk = Math.pow(.86, dt/16.7);
+    ["sw","ba","lf","lb","lfl","lbl","cr","ln"].forEach(k=>{ V.p[k] = (V.p[k]||0)*rk; });
+    V.e.ln = (V.e.ln||0)*rk; }
   particles.forEach(p => {
     if (p.ring){ p.r += p.vr*dt/16; p.life -= p.dec*dt/16;
       cx.globalAlpha = Math.max(0,p.life); cx.strokeStyle = p.color; cx.lineWidth = p.lw*(p.life);
@@ -1229,8 +1253,9 @@ function startFloor(){
         p:{ hp:playerMaxHp(), st:playerMaxSt(), guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0} },
         stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
   Dp.hp = S.p.hp; Dp.st = S.p.st; De.hp = E.hp; De.poise = E.poise; De.shd = E.shield;
-  V.p = { ox:0, oy:0, flash:0, ghost:0, block:0, visible:1, kb:0, z:0, zs:1, rot:0, sq:1 };
-  V.e = { ox:0, flash:0, visible:1, aura:0, charge:0, kb:0, telegraph:0, z:0, zs:1, rot:0, sq:1 };
+  V.p = { ox:0, oy:0, flash:0, ghost:0, block:0, visible:1, kb:0, z:0, zs:1, rot:0, sq:1,
+          sw:0, ba:0, lf:0, lb:0, lfl:0, lbl:0, cr:0, ln:0 };
+  V.e = { ox:0, flash:0, visible:1, aura:0, charge:0, kb:0, telegraph:0, z:0, zs:1, rot:0, sq:1, ln:0 };
   V.cz = 1;
   V.dim = 0; V.fullflash = 0; V.slash.show = 0; V.hitstop = 0;
   particles = []; floaters = []; afterimages = []; slashTrail = [];
@@ -1359,7 +1384,8 @@ function playerAct(kind){
   if (kind === "guard"){
     p.guard = true; p.st = Math.min(playerMaxSt(), p.st+15);
     addLog(`${h}玩家 <b>格挡</b>，体力 <span class="heal">+15</span>，减伤 70%${hasRelic("thorn")?" · 荆棘待发":""}`);
-    runSeq([{ dur:260, update:t=>{ V.p.block = t; V.p.sq = 1-0.09*Math.sin(t*Math.PI); V.p.z = 5*Math.sin(t*Math.PI); }, end:()=>{ V.p.block = 0.9; V.p.sq=1; V.p.z=0; } }], () => enemyPhase());
+    runSeq([{ dur:260, update:t=>{ V.p.block = t; V.p.sq = 1-0.09*Math.sin(t*Math.PI); V.p.z = 5*Math.sin(t*Math.PI);
+               V.p.ba = -0.55*Math.sin(t*Math.PI/2); V.p.cr = 5*Math.sin(t*Math.PI/2); }, end:()=>{ V.p.block = 0.9; V.p.sq=1; V.p.z=0; } }], () => enemyPhase());
     return;
   }
   if (kind === "dodge"){
@@ -1367,8 +1393,10 @@ function playerAct(kind){
     p.st -= 20; p.dodgeBuff = true;
     addLog(`${h}玩家 <b>闪避</b>，规避本回合伤害，下次轻击必暴击`);
     runSeq([
-      { dur:200, update:t=>{ V.p.ghost = t; V.p.ox = -46*t; V.p.rot = -0.18*t; V.p.sq = 1-0.12*t; V.p.zs = 1-0.06*t; } },
-      { dur:260, update:t=>{ V.p.ghost = 1-t; V.p.ox = -46*(1-t); V.p.rot = -0.18*(1-t); V.p.sq = 1-0.12*(1-t); V.p.zs = 1-0.06*(1-t); } },
+      { dur:200, update:t=>{ V.p.ghost = t; V.p.ox = -46*t; V.p.rot = -0.18*t; V.p.sq = 1-0.12*t; V.p.zs = 1-0.06*t;
+          V.p.cr = 10*t; V.p.ln = -0.14*t; V.p.lf = -12*t; V.p.lbl = 8*t; V.p.ba = .4*t; } },
+      { dur:260, update:t=>{ V.p.ghost = 1-t; V.p.ox = -46*(1-t); V.p.rot = -0.18*(1-t); V.p.sq = 1-0.12*(1-t); V.p.zs = 1-0.06*(1-t);
+          V.p.cr = 10*(1-t); V.p.ln = -0.14*(1-t); V.p.lf = -12*(1-t); V.p.lbl = 8*(1-t); V.p.ba = .4*(1-t); } },
     ], () => enemyPhase());
     return;
   }
@@ -1379,7 +1407,8 @@ function playerAct(kind){
     addLog(`${h}玩家使用药剂 <span class="heal">+${heal} HP</span>（剩 ${meta.potions}）`);
     runSeq([{ dur:420, start:()=>{ burst(P_BASE.x, P_BASE.y-70, 14, "#7fd8a0", 1.6, 1.4);
                floatText(P_BASE.x, P_BASE.y-130, `+${heal}`, "#7fd8a0", 20);
-               ringFx(P_BASE.x, P_BASE.y-60, "rgba(127,216,160,.6)"); } }], () => enemyPhase());
+               ringFx(P_BASE.x, P_BASE.y-60, "rgba(127,216,160,.6)"); },
+             update:t=>{ V.p.cr = 6*Math.sin(t*Math.PI); V.p.ba = -0.5*Math.sin(t*Math.PI); } }], () => enemyPhase());
     return;
   }
   if (kind === "riposte"){
@@ -1397,6 +1426,7 @@ function playerAct(kind){
       { dur:280, start:()=>{ V.e.sq = .88; V.e.z = -6; },
         update:t=>{
           V.p.ox = -8*t; V.p.sq = 1-.18*t; V.p.zs = 1+.06*t; V.p.rot = .1*t; V.p.z = 0;
+          V.p.sw = -.55*t; V.p.ba = -.35*t; V.p.cr = 7*t; V.p.ln = -.1*t;
           V.dim = .45*t; V.cz = 1+.12*t;
           V.e.z = -6-4*Math.sin(t*Math.PI);
           if (Math.random()<.35) converge();
@@ -1425,6 +1455,7 @@ function playerAct(kind){
         update:t=>{
           V.p.ox = -8 + (OVER+8)*t*t;
           V.p.z = 12*Math.sin(t*Math.PI); V.p.rot = .1-.32*t; V.p.zs = 1.06+.1*t; V.p.sq = .82+.1*t;
+          V.p.sw = 1.4; V.p.ba = .5; V.p.ln = .26; V.p.lf = 15; V.p.lfl = 6*Math.sin(t*Math.PI);
           V.slash.show = 1-t; V.slash.cross = 1-t;
           afterimages.push({who:'p',ox:V.p.ox,life:1});
         } },
@@ -1432,6 +1463,7 @@ function playerAct(kind){
       { dur:280, update:t=>{
           V.p.ox = OVER-8-6*t; V.p.z = 12*Math.cos(t*Math.PI/2)*(1-t);
           V.p.rot = -.22+.1*t; V.p.zs = 1.16-.06*t; V.p.sq = .92+.08*t;
+          V.p.sw = 1.4-.25*t; V.p.ba = .5-.15*t; V.p.ln = .26-.1*t; V.p.lf = 15*(1-t);
           V.e.ox = -46+30*t; V.e.z = 24*Math.cos(t*Math.PI/2); V.e.rot = -.38+.45*t; V.e.sq = .68+.2*t; V.e.zs = 1.1-.06*t;
           V.dim = .5-.12*t;
         } },
@@ -1439,6 +1471,7 @@ function playerAct(kind){
       { dur:340, update:t=>{
           V.p.ox = (OVER-14)*(1-t); V.p.rot = -.12+.5*Math.sin(t*Math.PI);
           V.p.zs = 1.1-.1*t; V.p.sq = 1; V.p.z = 0;
+          V.p.sw = 1.15*(1-t); V.p.ba = .35*(1-t); V.p.ln = .16*(1-t);
           V.dim = .38*(1-t);
           V.e.ox = -16*(1-t); V.e.rot = .07+.07*t; V.e.sq = .88+.12*t; V.e.zs = 1.04-.04*t;
         } },
@@ -1451,23 +1484,29 @@ function playerAct(kind){
     const d = Math.round(playerAtk()*4.0*1.5);
     const L = E_BASE.x-P_BASE.x-60, hit = {};
     runSeq([
-      // 蓄力蹲身
+      // 蓄力蹲身（双手举剑过头，屈膝下沉）
       { dur:240, start:()=>{ V.fullflash = .35; }, update:t=>{
           V.p.ox = -14*t; V.p.sq = 1-0.28*t; V.p.zs = 1+0.07*t; V.p.rot = 0.12*t; V.p.z = 0;
+          V.p.sw = -1.05*t; V.p.ba = -0.75*t; V.p.ln = -0.18*t; V.p.cr = 14*t; V.p.lf = -6*t;
           if (Math.random()<.3) afterimages.push({who:'p',ox:V.p.ox,life:1});
         } },
-      // 起跳（举剑跃至最高点）
+      // 起跳（举剑跃至最高点，双腿收拢）
       { dur:300, update:t=>{
           V.p.ox = -14*(1-t) + L*0.72*t;
           V.p.z = 108*Math.sin(t*Math.PI/2);
           V.p.zs = 1.07 - 0.11*t; V.p.rot = 0.12 - 0.42*t; V.p.sq = 1;
+          V.p.sw = -1.05-0.15*t; V.p.ba = -0.75-0.15*t; V.p.ln = -0.18+0.16*t;
+          V.p.cr = 14*(1-t); V.p.lf = -6+8*t;
+          V.p.lfl = 12*Math.sin(t*Math.PI/2); V.p.lbl = 10*Math.sin(t*Math.PI/2);
           if (Math.random()<.4) afterimages.push({who:'p',ox:V.p.ox,life:1});
         } },
-      // 下劈（落地瞬间结算）
+      // 下劈（空中引臂→全力劈落，落地瞬间结算）
       { dur:180, update:t=>{
           V.p.ox = L*0.72 + L*0.28*t;
           V.p.z = 108*Math.cos(t*Math.PI/2);
           V.p.zs = 0.96 + 0.24*t; V.p.rot = -0.3 - 0.12*t;
+          V.p.sw = -1.2+2.9*t; V.p.ba = -0.9+1.5*t; V.p.ln = -0.02+0.34*t;
+          V.p.lfl = 12*(1-t); V.p.lbl = 10*(1-t);
           if (t >= .88 && !hit.done){ hit.done = true;
             S.stats.dmg += d; E.hp = Math.max(0, E.hp-d);
             floatText(E_BASE.x-10, E_BASE.y-165, `${d}!!`, "#ffd76e", 38, { big:true });
@@ -1478,11 +1517,13 @@ function playerAct(kind){
             ringFx(E_BASE.x-20, E_BASE.y-70, "rgba(255,255,255,.7)");
             ringFx(P_BASE.x+L, P_BASE.y-8, "rgba(255,215,110,.6)");
             V.shake = 20; V.fullflash = .5; V.p.sq = .58; V.cz = 1.14;
+            V.p.cr = 16; V.p.lf = 12;
             addLog(`<span class="crit">终结技</span> → ${d} 伤害（4× 必暴击）`);
           }
         } },
       // 落地恢复
-      { dur:300, update:t=>{ V.p.ox = L*(1-t); V.p.sq = .58+0.42*t; V.p.zs = 1.2-0.2*t; V.p.rot = -0.42+0.42*t; } },
+      { dur:300, update:t=>{ V.p.ox = L*(1-t); V.p.sq = .58+0.42*t; V.p.zs = 1.2-0.2*t; V.p.rot = -0.42+0.42*t;
+          V.p.sw = 1.7*(1-t); V.p.ba = .6*(1-t); V.p.ln = .32*(1-t); V.p.cr = 16*(1-t); V.p.lf = 12*(1-t); } },
     ], () => afterPlayerAttack(true));
     return;
   }
@@ -1521,39 +1562,52 @@ function playerAct(kind){
   }
   const elemTxt = mv.elem && WEAKNESS[E.type] === mv.elem ? ` <span style="color:${ELEMENTS[mv.elem].color}">⚡弱点克制！</span>` : "";
   if (kind === "light"){
-    // 双段斩（前冲倾身 + 第二段小跳反手）
+    // 双段斩（前冲倾身 + 第二段小跳反手），四肢协同：引臂→跨步挥砍→反手回削→收势
     runSeq([
-      { dur:160, update:t=>{ V.p.ox = 92*t*t; V.p.rot = 0.14*t; V.p.zs = 1+0.05*t; V.p.z = 6*Math.sin(t*Math.PI); if (Math.random()<.5) afterimages.push({who:'p',ox:V.p.ox,life:1}); } },
+      { dur:160, update:t=>{ V.p.ox = 92*t*t; V.p.rot = 0.14*t; V.p.zs = 1+0.05*t; V.p.z = 6*Math.sin(t*Math.PI);
+          if (t<.42){ const u=t/.42; V.p.sw=-0.6*u; V.p.ln=-0.1*u; V.p.ba=.32*u; V.p.cr=4*u; V.p.lf=-6*u; }
+          else { const u=(t-.42)/.58; V.p.sw=-0.6+1.95*u; V.p.ln=-0.1+0.28*u; V.p.ba=.32-.82*u;
+                 V.p.cr=4*(1-u); V.p.lf=-6+8*u; V.p.lfl=7*Math.sin(u*Math.PI); }
+          if (Math.random()<.5) afterimages.push({who:'p',ox:V.p.ox,life:1}); } },
       { dur:130, start:()=>{
           S.frame += 1;
           hitEnemy(d, crit, mv, shTxt, elemTxt, 1);
           V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-70, flip:1, cross:0 };
           V.e.flash = 1; V.shake = 5;
-        }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); V.p.rot = 0.14-0.18*t; V.p.zs = 1.05-0.02*t; } },
+        }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); V.p.rot = 0.14-0.18*t; V.p.zs = 1.05-0.02*t;
+          V.p.sw = 1.35-0.42*t; V.p.ln = 0.18-0.08*t; V.p.ba = -.5+.2*t; V.p.lf = 2; } },
       { dur:130, start:()=>{
           const d2 = Math.max(1, Math.round(d*0.35));
           E.hp = Math.max(0, E.hp - d2); S.stats.dmg += d2;
           floatText(E_BASE.x+V.e.ox-8, E_BASE.y-130, `${d2}`, "#ffb0a0", 16);
           burst(E_BASE.x+V.e.ox-26, E_BASE.y-64, 6, "#ff7a4a", 1.6, 0.6);
           V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-84, flip:-1, cross:0 };
-        }, update:t=>{ V.slash.show = 1-t; V.p.rot = -0.04+0.18*t; V.p.z = 12*Math.sin(t*Math.PI); V.p.zs = 1.03+0.05*t; } },
-      { dur:150, update:t=>{ V.p.ox = 92*(1-t); V.p.rot = 0.14*(1-t); V.p.zs = 1.08-0.08*t; V.p.z = 0; } },
+        }, update:t=>{ V.slash.show = 1-t; V.p.rot = -0.04+0.18*t; V.p.z = 12*Math.sin(t*Math.PI); V.p.zs = 1.03+0.05*t;
+          V.p.sw = .93-1.48*t; V.p.ln = .1-.2*t; V.p.ba = -.3; V.p.lb = 8*t; V.p.lfl = 9*Math.sin(t*Math.PI); } },
+      { dur:150, update:t=>{ V.p.ox = 92*(1-t); V.p.rot = 0.14*(1-t); V.p.zs = 1.08-0.08*t; V.p.z = 0;
+          V.p.sw = -.55*(1-t); V.p.ln = -.1*(1-t); V.p.ba = -.3*(1-t); V.p.lb = 8*(1-t); V.p.lf = 2*(1-t); } },
     ], () => afterPlayerAttack(false));
   } else {
-    // 重击·雷陨跳劈：后撤蓄力 → 跃起 → 落地劈（镜头冲击+落地尘环）
+    // 重击·雷陨跳劈：双手举剑蓄力 → 屈膝跃起 → 空中引臂 → 劈落（四肢协同）
     const reach = 150;
     runSeq([
-      { dur:180, update:t=>{ V.p.ox = -12*t; V.p.sq = 1-0.22*t; V.p.zs = 1-0.04*t; V.p.rot = 0.12*t; } },
+      { dur:180, update:t=>{ V.p.ox = -12*t; V.p.sq = 1-0.22*t; V.p.zs = 1-0.04*t; V.p.rot = 0.12*t;
+          V.p.sw = -0.95*t; V.p.ba = -0.62*t; V.p.ln = -0.16*t; V.p.cr = 11*t; V.p.lf = -5*t; } },
       { dur:300, update:t=>{
           V.p.ox = -12*(1-t) + reach*0.55*t;
           V.p.z = 92*Math.sin(t*Math.PI/2);
           V.p.zs = 0.96+0.1*t; V.p.rot = 0.12-0.4*t; V.p.sq = 1;
+          V.p.sw = -0.95-0.3*t; V.p.ba = -0.62-0.2*t; V.p.ln = -0.16+0.12*t;
+          V.p.cr = 11*(1-t); V.p.lf = -5+7*t;
+          V.p.lfl = 10*Math.sin(t*Math.PI/2); V.p.lbl = 8*Math.sin(t*Math.PI/2);
           if (Math.random()<.4) afterimages.push({who:'p',ox:V.p.ox,life:1});
         } },
       { dur:150, update:t=>{
           V.p.ox = reach*0.55 + reach*0.3*t;
           V.p.z = 92*Math.cos(t*Math.PI/2);
           V.p.zs = 1.06+0.12*t; V.p.rot = -0.28-0.1*t;
+          V.p.sw = -1.25+2.6*t; V.p.ba = -0.82+1.1*t; V.p.ln = -0.04+0.24*t;
+          V.p.lfl = 10*(1-t); V.p.lbl = 8*(1-t); V.p.lf = 2;
         } },
       { dur:170, start:()=>{
           S.frame += mv.recovery;
@@ -1565,8 +1619,11 @@ function playerAct(kind){
           burst(P_BASE.x+reach*0.85, P_BASE.y-4, 20, "#c9a86a", 2.6, 0.3);
           burst(E_BASE.x+V.e.ox-30, E_BASE.y-70, crit?18:12, "#ffd76e", 2.4, 0.8);
           V.p.sq = .6; V.p.zs = 1.18;
-        }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); V.p.sq = .6+0.25*t; V.p.zs = 1.18-0.1*t; } },
-      { dur:220, update:t=>{ V.p.ox = reach*0.85*(1-t); V.p.sq = .85+0.15*t; V.p.zs = 1.08-0.08*t; V.p.rot = -0.38+0.38*t; } },
+          V.p.sw = 1.5; V.p.ln = 0.3; V.p.cr = 15; V.p.lf = 10; V.p.ba = 0.5;
+        }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); V.p.sq = .6+0.25*t; V.p.zs = 1.18-0.1*t;
+          V.p.cr = 15-5*t; V.p.ln = 0.3-0.05*t; } },
+      { dur:220, update:t=>{ V.p.ox = reach*0.85*(1-t); V.p.sq = .85+0.15*t; V.p.zs = 1.08-0.08*t; V.p.rot = -0.38+0.38*t;
+          V.p.sw = 1.5*(1-t); V.p.ba = .5*(1-t); V.p.ln = .25*(1-t); V.p.cr = 10*(1-t); V.p.lf = 10*(1-t); } },
     ], () => afterPlayerAttack(false));
   }
 }
@@ -1577,7 +1634,7 @@ function hitEnemy(d, crit, mv, shTxt, elemTxt, poiseMul){
   V.comboCount++; V.comboTimer = 1400;
   // 击退（朝向敌人方向）+ 受击挤压
   V.e.kb = -26 - (crit?16:0);
-  V.e.sq = crit ? .78 : .85; V.e.zs = 1.06;
+  V.e.sq = crit ? .78 : .85; V.e.zs = 1.06; V.e.ln = -0.16;
   // 剑痕拖尾
   const flip = mv.name === "轻击" ? 1 : 1;
   const col = ELEMENTS[mv.elem].color;
@@ -1639,24 +1696,24 @@ const SLAM_HOP = { guard:30, berserker:74, butcher:42, lord:58, bloodfang:52, go
 function buildAtkEvent(e){
   const D = E_BASE.x - P_BASE.x - 80; // 冲刺距离（ox 负方向）
   const strike = ()=>{ if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, !!e.ranged, e.drain, !!e.flurry); } };
-  const rest = ()=>{ V.e.ox=0; V.e.z=0; V.e.zs=1; V.e.rot=0; V.e.sq=1; };
+  const rest = ()=>{ V.e.ox=0; V.e.z=0; V.e.zs=1; V.e.rot=0; V.e.sq=1; V.e.ln=0; };
   if (e.style === "cast"){
     return { dur:880, start:()=>{ V.e.telegraph = 1; },
       update:t=>{
         if (t < .36){
           const u=t/.36;
           V.e.ox=-30*u; V.e.z=60*Math.sin(u*Math.PI/2); V.e.zs=1+.08*u; V.e.sq=1;
-          V.e.charge=.6*u; V.e.telegraph=.6+.4*Math.sin(t*Math.PI*6);
+          V.e.charge=.6*u; V.e.telegraph=.6+.4*Math.sin(t*Math.PI*6); V.e.ln=.06*u;
         } else {
           if (!e._fired){ e._fired = true; V.proj={ show:1, x:E_BASE.x+V.e.ox, y:E_BASE.y-150, r:10 };
             ringFx(E_BASE.x+V.e.ox, E_BASE.y-120, "rgba(180,120,255,.75)"); burst(E_BASE.x+V.e.ox, E_BASE.y-140, 8, "#b58ae8", 2, .8); }
           const u=Math.min(1,(t-.36)/.5);
           V.proj.x = E_BASE.x+V.e.ox + (P_BASE.x-(E_BASE.x+V.e.ox))*u;
           V.proj.y = (E_BASE.y-150) + Math.sin(u*Math.PI)*30;
-          V.e.telegraph=.5*(1-u);
+          V.e.telegraph=.5*(1-u); V.e.ln=.06-.2*u;
           if (u >= 1){ V.proj.show=0; strike(); }
         }
-        if (t > .9){ const u=(t-.9)/.1; V.e.ox=-30*(1-u); V.e.z=60*(1-u); V.e.zs=1.08-.08*u; V.e.charge=0; }
+        if (t > .9){ const u=(t-.9)/.1; V.e.ox=-30*(1-u); V.e.z=60*(1-u); V.e.zs=1.08-.08*u; V.e.charge=0; V.e.ln=-.14*(1-u); }
       },
       end:()=>{ V.proj.show=0; V.e.telegraph=0; V.e.charge=0; rest(); } };
   }
@@ -1666,70 +1723,70 @@ function buildAtkEvent(e){
       start:()=>{ V.e.telegraph = 1; },
       update:t=>{
         if (t < .14){ const u=t/.14; V.e.ox=10*u; V.e.sq=1-.22*u; V.e.zs=1+.05*u; V.e.rot=.1*u; V.e.z=0;
-          V.e.telegraph=.5+.5*Math.sin(t*Math.PI*8); }
+          V.e.telegraph=.5+.5*Math.sin(t*Math.PI*8); V.e.ln=-.2*u; }
         else if (t < .52){ const u=(t-.14)/.38;
           V.e.ox=10*(1-u)-D*.7*u; V.e.z=hop*Math.sin(u*Math.PI/2); V.e.zs=1.05-.08*u; V.e.rot=.1-.25*u; V.e.sq=1;
-          V.e.telegraph=.4+.4*Math.sin(t*Math.PI*8); }
+          V.e.telegraph=.4+.4*Math.sin(t*Math.PI*8); V.e.ln=-.2+.55*u; }
         else if (t < .62){ const u=(t-.52)/.1;
-          V.e.ox=-D*.7-D*.3*u; V.e.z=hop*Math.cos(u*Math.PI/2); V.e.zs=.97+.16*u; V.e.rot=-.15-.12*u; }
+          V.e.ox=-D*.7-D*.3*u; V.e.z=hop*Math.cos(u*Math.PI/2); V.e.zs=.97+.16*u; V.e.rot=-.15-.12*u; V.e.ln=.35; }
         else {
           if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, false, e.drain);
             V.shake = 16; V.e.sq = .55; V.e.zs = 1.13; V.e.telegraph = 0; V.cz = 1.12;
             ringFx(P_BASE.x+60, P_BASE.y-8, "rgba(255,120,90,.85)");
             burst(P_BASE.x+60, P_BASE.y-4, 18, "#d8a878", 2.8, 0.3);
           }
-          if (t < .8){ V.e.ox=-D; V.e.rot=-.27; }
-          else { const u=(t-.8)/.2; V.e.ox=-D*(1-u); V.e.rot=-.27*(1-u); V.e.sq=.55+.45*u; V.e.zs=1.13-.13*u; }
+          if (t < .8){ V.e.ox=-D; V.e.rot=-.27; V.e.ln=.38; }
+          else { const u=(t-.8)/.2; V.e.ox=-D*(1-u); V.e.rot=-.27*(1-u); V.e.sq=.55+.45*u; V.e.zs=1.13-.13*u; V.e.ln=.38*(1-u); }
         }
       }, end:()=>{ V.e.telegraph=0; rest(); } };
   }
   if (e.style === "sweep"){
     return { dur:560, update:t=>{
-        if (t < .34){ const u=t/.34; V.e.ox=10*u; V.e.rot=.22*u; V.e.sq=1-.05*u; }
+        if (t < .34){ const u=t/.34; V.e.ox=10*u; V.e.rot=.22*u; V.e.sq=1-.05*u; V.e.ln=-.18*u; }
         else if (t < .58){ const u=(t-.34)/.24;
-          V.e.ox=10*(1-u)-D*u; V.e.rot=.22-.5*u; V.e.zs=1+.1*u; V.e.z=6*Math.sin(u*Math.PI); V.e.sq=1; }
+          V.e.ox=10*(1-u)-D*u; V.e.rot=.22-.5*u; V.e.zs=1+.1*u; V.e.z=6*Math.sin(u*Math.PI); V.e.sq=1; V.e.ln=-.18+.5*u; }
         else { strike();
-          if (t < .72){ V.e.ox=-D; V.e.rot=-.28; V.e.zs=1.1; }
-          else { const u=(t-.72)/.28; V.e.ox=-D*(1-u); V.e.rot=-.28*(1-u); V.e.zs=1.1-.1*u; } }
+          if (t < .72){ V.e.ox=-D; V.e.rot=-.28; V.e.zs=1.1; V.e.ln=.32; }
+          else { const u=(t-.72)/.28; V.e.ox=-D*(1-u); V.e.rot=-.28*(1-u); V.e.zs=1.1-.1*u; V.e.ln=.32*(1-u); } }
       }, end:rest };
   }
   if (e.style === "dash"){
     return { dur:420, update:t=>{
-        if (t < .12){ const u=t/.12; V.e.ox=10*u; V.e.rot=.1*u; V.e.sq=1-.1*u; }
+        if (t < .12){ const u=t/.12; V.e.ox=10*u; V.e.rot=.1*u; V.e.sq=1-.1*u; V.e.ln=-.14*u; }
         else if (t < .46){ const u=(t-.12)/.34;
-          V.e.ox=10*(1-u)-D*u; V.e.rot=.1-.34*u; V.e.zs=1+.16*u; V.e.z=8*Math.sin(u*Math.PI); V.e.sq=1; }
+          V.e.ox=10*(1-u)-D*u; V.e.rot=.1-.34*u; V.e.zs=1+.16*u; V.e.z=8*Math.sin(u*Math.PI); V.e.sq=1; V.e.ln=-.14+.5*u; }
         else {
           if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, false, e.drain);
             burst(P_BASE.x+80, P_BASE.y-6, 10, "#e8d5ff", 2.4, 0.5); }
-          if (t < .6){ V.e.ox=-D; V.e.rot=-.24; V.e.zs=1.16; }
-          else { const u=(t-.6)/.4; V.e.ox=-D*(1-u); V.e.rot=-.24*(1-u); V.e.zs=1.16-.16*u; V.e.z=0; } }
+          if (t < .6){ V.e.ox=-D; V.e.rot=-.24; V.e.zs=1.16; V.e.ln=.36; }
+          else { const u=(t-.6)/.4; V.e.ox=-D*(1-u); V.e.rot=-.24*(1-u); V.e.zs=1.16-.16*u; V.e.z=0; V.e.ln=.36*(1-u); } }
       }, end:rest };
   }
   if (e.style === "spin"){ // 旋风斩：双周旋转逼近（旋转角终点与起始同相位，归位无跳变）
     return { dur:760, update:t=>{
-        if (t < .16){ const u=t/.16; V.e.ox=12*u; V.e.rot=.3*u; V.e.sq=1-.08*u; }
+        if (t < .16){ const u=t/.16; V.e.ox=12*u; V.e.rot=.3*u; V.e.sq=1-.08*u; V.e.ln=-.1*u; }
         else if (t < .72){ const u=(t-.16)/.56;
           V.e.ox=12*(1-u)-D*.55*u;
           V.e.rot=.3+Math.PI*4*(u<.5 ? 2*u*u : 1-Math.pow(-2*u+2,2)/2);
-          V.e.z=10*Math.sin(u*Math.PI); V.e.zs=1+.1*Math.sin(u*Math.PI); V.e.sq=1;
+          V.e.z=10*Math.sin(u*Math.PI); V.e.zs=1+.1*Math.sin(u*Math.PI); V.e.sq=1; V.e.ln=.12*Math.sin(u*Math.PI);
           if (u >= .5) strike();
         }
-        else { const u=(t-.72)/.28; V.e.ox=-D*.55*(1-u); V.e.rot=.3*(1-u); V.e.zs=1.1-.1*u; V.e.z=0; }
+        else { const u=(t-.72)/.28; V.e.ox=-D*.55*(1-u); V.e.rot=.3*(1-u); V.e.zs=1.1-.1*u; V.e.z=0; V.e.ln=0; }
       }, end:rest };
   }
   if (e.style === "pounce"){ // 扑咬：压低身体 → 高弧线跃扑 → 砸落
     return { dur:840, update:t=>{
-        if (t < .2){ const u=t/.2; V.e.sq=1-.3*u; V.e.rot=.2*u; V.e.ox=-6*u; V.e.zs=1+.04*u; }
+        if (t < .2){ const u=t/.2; V.e.sq=1-.3*u; V.e.rot=.2*u; V.e.ox=-6*u; V.e.zs=1+.04*u; V.e.ln=-.22*u; }
         else if (t < .78){ const u=(t-.2)/.58;
           V.e.ox=-6*(1-u)-D*1.08*u;
           V.e.z=112*Math.sin(u*Math.PI); V.e.sq=.7+.5*Math.sin(u*Math.PI);
-          V.e.rot=.2-.5*u; V.e.zs=1.04-.06*u;
+          V.e.rot=.2-.5*u; V.e.zs=1.04-.06*u; V.e.ln=-.22+.62*u;
         }
         else { if (!e._hit){ e._hit=true; enemyHit(e.mult, e.name, false, e.drain);
             V.shake=14; V.cz=1.1; V.e.sq=.52; V.e.zs=1.14; V.e.rot=-.2;
             ringFx(P_BASE.x-20, P_BASE.y-8, "rgba(255,110,110,.85)");
             burst(P_BASE.x-20, P_BASE.y-4, 16, "#c96a5a", 2.6, .3); }
-          const u=(t-.78)/.22; V.e.ox=-D*1.08*(1-u); V.e.sq=.52+.48*u; V.e.rot=-.2*(1-u); V.e.zs=1.14-.14*u; }
+          const u=(t-.78)/.22; V.e.ox=-D*1.08*(1-u); V.e.sq=.52+.48*u; V.e.rot=-.2*(1-u); V.e.zs=1.14-.14*u; V.e.ln=.4*(1-u); }
       }, end:rest };
   }
   if (e.style === "submerge"){ // 影遁：潜入地面 → 贴地滑行 → 玩家脚下爆发突袭
@@ -1740,9 +1797,10 @@ function buildAtkEvent(e){
           V.e.ox=-10-D*.9*u; V.e.sq=.3; V.e.z=-34; V.e.rot=.15; V.e.visible=.25; }
         else if (t < .68){ const u=(t-.55)/.13;
           V.e.ox=-10-D*.9; V.e.sq=.3+.7*u; V.e.z=-34*(1-u); V.e.rot=.15*(1-u); V.e.visible=.25+.75*u;
+          V.e.ln=.3*u;
           if (u >= .6) strike();
         }
-        else { const u=(t-.68)/.32; V.e.ox=(-10-D*.9)*(1-u); V.e.zs=1.12-.12*u; V.e.visible=1; }
+        else { const u=(t-.68)/.32; V.e.ox=(-10-D*.9)*(1-u); V.e.zs=1.12-.12*u; V.e.visible=1; V.e.ln=.3*(1-u); }
       }, end:()=>{ V.e.telegraph=0; V.e.visible=1; rest(); } };
   }
   if (e.style === "roll"){ // 磐岩滚压：蜷成岩球双周旋转碾过
@@ -1763,9 +1821,9 @@ function buildAtkEvent(e){
       update:t=>{
         if (t < .38){ const u=t/.38;
           V.e.z=128*Math.sin(u*Math.PI/2); V.e.zs=1+.1*u; V.e.sq=1-.06*u; V.e.ox=-24*u;
-          V.e.charge=.7*u; V.e.telegraph=.7+.3*Math.sin(t*Math.PI*8);
+          V.e.charge=.7*u; V.e.telegraph=.7+.3*Math.sin(t*Math.PI*8); V.e.ln=.05*u;
         } else if (t < .58){ const u=(t-.38)/.2;
-          V.e.z=128; V.e.zs=1.1; V.e.charge=.7+.3*u;
+          V.e.z=128; V.e.zs=1.1; V.e.charge=.7+.3*u; V.e.ln=.05-.2*u;
           if (u >= .5 && !e._fired){ e._fired = true; V.proj={ show:1, x:P_BASE.x, y:36, r:13 }; V.cz = 1.14; }
         } else if (t < .78){ const u=(t-.58)/.2;
           if (V.proj.show){ V.proj.y = 36 + (P_BASE.y-52-36)*u; }
@@ -1775,29 +1833,29 @@ function buildAtkEvent(e){
             ringFx(P_BASE.x, P_BASE.y-8, "rgba(199,120,255,.9)");
             burst(P_BASE.x, P_BASE.y-10, 24, "#c792ea", 3.2, .6); }
         } else { const u=(t-.78)/.22;
-          V.e.z=128*(1-u); V.e.zs=1.1-.1*u; V.e.ox=-24*(1-u); V.e.sq=.94+.06*u; V.e.charge=0;
+          V.e.z=128*(1-u); V.e.zs=1.1-.1*u; V.e.ox=-24*(1-u); V.e.sq=.94+.06*u; V.e.charge=0; V.e.ln=-.15*(1-u);
         }
       }, end:()=>{ V.proj.show=0; V.e.telegraph=0; V.e.charge=0; rest(); } };
   }
   if (e.style === "pulse"){ // 汲取之爪：悬浮牵引，双环吸血
     return { dur:800, start:()=>{ ringFx(E_BASE.x, E_BASE.y-70, "rgba(255,120,150,.7)"); },
       update:t=>{
-        if (t < .3){ const u=t/.3; V.e.z=38*Math.sin(u*Math.PI/2); V.e.ox=-D*.4*u; V.e.zs=1+.05*u; V.e.rot=-.06*u; }
+        if (t < .3){ const u=t/.3; V.e.z=38*Math.sin(u*Math.PI/2); V.e.ox=-D*.4*u; V.e.zs=1+.05*u; V.e.rot=-.06*u; V.e.ln=.22*u; }
         else if (t < .62){ const u=(t-.3)/.32;
-          V.e.z=38; V.e.ox=-D*.4-D*.2*u; V.e.zs=1.05;
+          V.e.z=38; V.e.ox=-D*.4-D*.2*u; V.e.zs=1.05; V.e.ln=.22;
           if (u >= .5){ const first = !e._hit; strike(); if (first) ringFx(P_BASE.x, P_BASE.y-66, "rgba(255,120,150,.8)"); }
         }
-        else { const u=(t-.62)/.38; V.e.ox=-D*.6*(1-u); V.e.z=38*(1-u); V.e.zs=1.05-.05*u; V.e.rot=-.06*(1-u); }
+        else { const u=(t-.62)/.38; V.e.ox=-D*.6*(1-u); V.e.z=38*(1-u); V.e.zs=1.05-.05*u; V.e.rot=-.06*(1-u); V.e.ln=.22*(1-u); }
       }, end:rest };
   }
   // lunge（默认突刺）
   return { dur:520, update:t=>{
-      if (t < .18){ const u=t/.18; V.e.ox=16*u; V.e.rot=.14*u; V.e.sq=1-.08*u; }
+      if (t < .18){ const u=t/.18; V.e.ox=16*u; V.e.rot=.14*u; V.e.sq=1-.08*u; V.e.ln=-.16*u; }
       else if (t < .58){ const u=(t-.18)/.4;
-        V.e.ox=16*(1-u)-D*u; V.e.rot=.14-.3*u; V.e.zs=1+.12*u; V.e.z=10*Math.sin(u*Math.PI); V.e.sq=1; }
+        V.e.ox=16*(1-u)-D*u; V.e.rot=.14-.3*u; V.e.zs=1+.12*u; V.e.z=10*Math.sin(u*Math.PI); V.e.sq=1; V.e.ln=-.16+.48*u; }
       else { strike();
-        if (t < .74){ V.e.ox=-D; V.e.rot=-.16; V.e.zs=1.12; }
-        else { const u=(t-.74)/.26; V.e.ox=-D*(1-u); V.e.rot=-.16*(1-u); V.e.zs=1.12-.12*u; V.e.z=0; } }
+        if (t < .74){ V.e.ox=-D; V.e.rot=-.16; V.e.zs=1.12; V.e.ln=.32; }
+        else { const u=(t-.74)/.26; V.e.ox=-D*(1-u); V.e.rot=-.16*(1-u); V.e.zs=1.12-.12*u; V.e.z=0; V.e.ln=.32*(1-u); } }
     }, end:rest };
 }
 function enemyPhase(){
@@ -1870,8 +1928,8 @@ function enemyPhase(){
         floatText(E_BASE.x, E_BASE.y-170, "PHASE UP", "#ff9c9c", 24, { big:true });
       }, update:t=>{ V.e.aura = 0.6+0.4*Math.sin(t*Math.PI);
         V.e.z = 52*Math.sin(t*Math.PI); V.e.rot = .4*Math.sin(t*Math.PI*2);
-        V.e.zs = 1+.09*Math.sin(t*Math.PI); V.e.sq = 1-.08*Math.sin(t*Math.PI); } };
-    if (e.charge) return { dur:520, start:()=>{ addLog(`${tag()}<b>${E.name}</b> ${e.msg}`); V.e.charge = 0.1; V.e.telegraph = 1; }, update:t=>{ V.e.charge = 0.1+0.9*t; V.e.telegraph = 0.6+0.4*Math.sin(t*Math.PI*4); V.e.z = 12*Math.sin(t*Math.PI/2); V.e.zs = 1+0.03*t; }, end:()=>{ V.e.z=0; V.e.zs=1; } };
+        V.e.zs = 1+.09*Math.sin(t*Math.PI); V.e.sq = 1-.08*Math.sin(t*Math.PI); V.e.ln = .15*Math.sin(t*Math.PI); } };
+    if (e.charge) return { dur:520, start:()=>{ addLog(`${tag()}<b>${E.name}</b> ${e.msg}`); V.e.charge = 0.1; V.e.telegraph = 1; }, update:t=>{ V.e.charge = 0.1+0.9*t; V.e.telegraph = 0.6+0.4*Math.sin(t*Math.PI*4); V.e.z = 12*Math.sin(t*Math.PI/2); V.e.zs = 1+0.03*t; V.e.ln = -.12*t; }, end:()=>{ V.e.z=0; V.e.zs=1; V.e.ln=0; } };
     if (e.reshield) return { dur:420, start:()=>{
         const add = Math.round(E.maxshield*e.reshield);
         E.shield = Math.min(E.maxshield, E.shield+add);
@@ -1907,6 +1965,7 @@ function enemyHit(mult, name, ranged, drain, keepDodge){
   V.p.flash = 1;
   V.hitstop = 60; // 受击停顿
   V.p.kb = 26;    // 玩家被击退
+  V.p.ln = -0.15; V.p.sw = .55; V.p.ba = .35;  // 受击踉跄：后仰+手臂张摆
   final = Math.round(final * STANCES[meta.stance].taken);
   if (p.dodgeBuff){ final = 0; note = `<span class="heal">被闪避！</span>`;
     floatText(P_BASE.x, P_BASE.y-140, "MISS", "#7fd8a0", 20); }
