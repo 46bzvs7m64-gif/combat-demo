@@ -71,22 +71,16 @@
   .footer { text-align:center; font-size:11px; color:#666; margin-top:14px; }
 
   /* ========== 标题画面 ========== */
-  .title-scene { position:relative; border-radius:14px; overflow:hidden; margin:-24px -24px 18px; height:320px;
-    background:linear-gradient(180deg,#1a0a2e 0%,#2d1b4e 35%,#4a2c6e 60%,#6b3f8f 80%,#8b5aaf 100%); }
-  .title-scene::before { content:""; position:absolute; inset:0;
+  .title-scene { position:relative; border-radius:14px; overflow:hidden; margin:-24px -24px 18px; height:340px;
+    background:#0a0518; }
+  #title-cv { position:absolute; inset:0; width:100%; height:100%; display:block; z-index:1; }
+  .title-scene::before { content:""; position:absolute; inset:0; z-index:3; pointer-events:none;
     background:
-      radial-gradient(ellipse 60% 40% at 50% 100%, rgba(255,180,80,.4), transparent 70%),
-      radial-gradient(ellipse 80% 30% at 50% 0%, rgba(120,80,200,.5), transparent 70%);
-    animation:titleGlow 4s ease-in-out infinite alternate; }
-  @keyframes titleGlow { from{opacity:.7} to{opacity:1} }
+      radial-gradient(ellipse 70% 45% at 50% 115%, rgba(255,150,70,.28), transparent 70%),
+      radial-gradient(ellipse 100% 40% at 50% 110%, rgba(0,0,0,0) 40%, rgba(6,2,16,.55) 100%); }
   /* 远景山/塔轮廓 */
-  .title-mountains { position:absolute; bottom:0; left:0; right:0; height:130px; }
-  .title-mountains svg { width:100%; height:100%; display:block; }
-  /* 回廊拱门 */
-  .title-arch { position:absolute; left:50%; bottom:0; transform:translateX(-50%); width:220px; height:240px; }
-  .title-arch svg { width:100%; height:100%; }
   /* 飘升粒子 */
-  .ember { position:absolute; width:3px; height:3px; border-radius:50%; background:#ffb86b;
+  .ember { position:absolute; width:3px; height:3px; border-radius:50%; background:#ffb86b; z-index:4; pointer-events:none;
     box-shadow:0 0 6px #ffb86b,0 0 12px #ff8a3d; opacity:0; animation:rise linear infinite; }
   @keyframes rise {
     0% { transform:translateY(0) scale(1); opacity:0; }
@@ -269,7 +263,7 @@ function saveGame(){ try{ localStorage.setItem(RUN_KEY, JSON.stringify(meta)); }
 function loadGame(){ try{ return JSON.parse(localStorage.getItem(RUN_KEY)); }catch(e){ return null; } }
 
 /* ==================== 画面层 ==================== */
-const cv = document.getElementById("cv"), cx = cv.getContext("2d");
+const cv = document.getElementById("cv"); let cx = cv.getContext("2d");
 const W = cv.width, H = cv.height;
 const P_BASE = { x:225, y:318 }, E_BASE = { x:735, y:318 };
 const V = {
@@ -1533,37 +1527,7 @@ function showMenu(){
   showOverlay(`
     <div class="title-scene">
       ${embers}
-      <!-- 远景山脉 -->
-      <div class="title-mountains">
-        <svg viewBox="0 0 600 130" preserveAspectRatio="none">
-          <polygon points="0,130 80,70 140,100 210,50 290,90 360,40 440,85 520,55 600,100 600,130" fill="#1a0f33" opacity=".8"/>
-          <polygon points="0,130 60,90 130,110 200,75 280,105 350,70 430,100 510,80 600,110 600,130" fill="#0f0820" opacity=".9"/>
-        </svg>
-      </div>
-      <!-- 回廊拱门 -->
-      <div class="title-arch">
-        <svg viewBox="0 0 220 240">
-          <defs>
-            <linearGradient id="archGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#5a3a8a"/>
-              <stop offset="1" stop-color="#2a1650"/>
-            </linearGradient>
-            <radialGradient id="archGlow" cx="50%" cy="60%" r="50%">
-              <stop offset="0" stop-color="#ff8a3d" stop-opacity=".6"/>
-              <stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/>
-            </radialGradient>
-          </defs>
-          <!-- 拱门主体 -->
-          <path d="M 30 240 L 30 90 Q 30 20 110 20 Q 190 20 190 90 L 190 240 Z" fill="url(#archGrad)" stroke="#8a5abf" stroke-width="2"/>
-          <!-- 门洞 -->
-          <path d="M 50 240 L 50 95 Q 50 35 110 35 Q 170 35 170 95 L 170 240 Z" fill="#0a0518"/>
-          <!-- 门内光 -->
-          <ellipse cx="110" cy="150" rx="55" ry="70" fill="url(#archGlow)"/>
-          <!-- 拱顶装饰 -->
-          <circle cx="110" cy="20" r="6" fill="#ffd76e"/>
-          <path d="M 60 85 Q 110 55 160 85" fill="none" stroke="#ffd76e" stroke-width="1.5" opacity=".7"/>
-        </svg>
-      </div>
+      <canvas id="title-cv" width="900" height="400"></canvas>
       <!-- 标题文字 -->
       <div class="title-text">
         <div class="game-title">试炼回廊</div>
@@ -1585,6 +1549,104 @@ function showMenu(){
       <div class="row"><span class="k">成长</span><span>每层通关：回廊之魂 + 遗物三选一；魂可永久加点</span></div>
     </div>
   `, "");
+  startTitleScene();
+}
+
+/* ==================== 标题画面：动态场景 ==================== */
+let titleRAF = 0;
+function startTitleScene(){
+  const tcv = document.getElementById("title-cv");
+  if (!tcv) return;
+  const tx = tcv.getContext("2d");
+  const TW = tcv.width, TH = tcv.height, CX = TW/2;
+  const stars = Array.from({length:80},()=>({x:Math.random()*TW,y:Math.random()*TH*.6,r:.5+Math.random()*1.3,p:Math.random()*6.28}));
+  const order = ["guard","berserker","sorcerer","butcher","lord","bloodfang","voidmage","golem","shadow","heart"];
+  const ringC = { guard:"#8fb4ff", berserker:"#ff9a4a", sorcerer:"#c792ea", butcher:"#ff7a5a", lord:"#ffd76e",
+    bloodfang:"#ff5a7a", voidmage:"#7ab8ff", golem:"#7dffb8", shadow:"#c792ea", heart:"#ff8aa8" };
+  const arcY = [108,128,148,128,108];
+  const hexA = (h,a)=>{ const n=parseInt(h.slice(1),16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; };
+  cancelAnimationFrame(titleRAF);
+  const render = ()=>{
+    if (!document.getElementById("title-cv")) return;
+    const gameCx = cx; cx = tx;
+    const t = V.t;
+    // 夜空
+    let g = tx.createLinearGradient(0,0,0,TH);
+    g.addColorStop(0,"#0a0418"); g.addColorStop(.55,"#1d1040"); g.addColorStop(.82,"#341d5a"); g.addColorStop(1,"#0c0620");
+    tx.fillStyle=g; tx.fillRect(0,0,TW,TH);
+    // 星
+    stars.forEach(s=>{ tx.globalAlpha=.2+.6*Math.abs(Math.sin(t/700+s.p)); tx.fillStyle="#ddd2ff"; tx.beginPath(); tx.arc(s.x,s.y,s.r,0,7); tx.fill(); });
+    tx.globalAlpha=1;
+    // 月
+    const mx=752,my=66;
+    let mg=tx.createRadialGradient(mx,my,6,mx,my,76);
+    mg.addColorStop(0,"rgba(242,228,255,.95)"); mg.addColorStop(.22,"rgba(200,180,232,.32)"); mg.addColorStop(1,"rgba(200,180,232,0)");
+    tx.fillStyle=mg; tx.beginPath(); tx.arc(mx,my,76,0,7); tx.fill();
+    tx.fillStyle="#f0e8ff"; tx.beginPath(); tx.arc(mx,my,25,0,7); tx.fill();
+    tx.fillStyle="rgba(22,12,44,.6)"; tx.beginPath(); tx.arc(mx-9,my-7,23,0,7); tx.fill();
+    // 远山（两层）
+    tx.fillStyle="#1a1038"; tx.beginPath();
+    [[0,310],[90,258],[172,292],[262,238],[352,284],[452,232],[562,278],[662,246],[782,286],[900,258]]
+      .forEach((p,i)=>i?tx.lineTo(p[0],p[1]):tx.moveTo(p[0],p[1]));
+    tx.lineTo(900,400); tx.lineTo(0,400); tx.closePath(); tx.fill();
+    tx.fillStyle="#120b2e"; tx.beginPath();
+    [[0,346],[100,312],[202,336],[302,300],[422,334],[522,304],[642,332],[762,308],[900,338]]
+      .forEach((p,i)=>i?tx.lineTo(p[0],p[1]):tx.moveTo(p[0],p[1]));
+    tx.lineTo(900,400); tx.lineTo(0,400); tx.closePath(); tx.fill();
+    // 回廊拱门
+    const ag = tx.createLinearGradient(0,160,0,400);
+    ag.addColorStop(0,"#4a3478"); ag.addColorStop(1,"#1d1238");
+    tx.fillStyle=ag; tx.strokeStyle="#7a52b0"; tx.lineWidth=2.5;
+    tx.beginPath(); tx.moveTo(366,400); tx.lineTo(366,250); tx.quadraticCurveTo(366,162,450,162); tx.quadraticCurveTo(534,162,534,250); tx.lineTo(534,400); tx.closePath(); tx.fill(); tx.stroke();
+    tx.fillStyle="#050110"; tx.beginPath();
+    tx.moveTo(390,400); tx.lineTo(390,258); tx.quadraticCurveTo(390,196,450,196); tx.quadraticCurveTo(510,196,510,258); tx.lineTo(510,400); tx.closePath(); tx.fill();
+    // 门内暖光（呼吸）
+    const glow = .55+.45*Math.sin(t/900);
+    let gg=tx.createRadialGradient(CX,300,8,CX,300,140);
+    gg.addColorStop(0,`rgba(255,190,110,${.55*glow})`); gg.addColorStop(.55,`rgba(255,130,60,${.22*glow})`); gg.addColorStop(1,"rgba(255,120,60,0)");
+    tx.fillStyle=gg; tx.beginPath(); tx.arc(CX,300,140,0,7); tx.fill();
+    // 拱顶符文石（旋转虚线环）
+    tx.save(); tx.translate(CX,150); tx.rotate(t/1600);
+    tx.strokeStyle="rgba(255,215,110,.7)"; tx.lineWidth=2; tx.setLineDash([7,7]);
+    tx.beginPath(); tx.arc(0,0,20,0,7); tx.stroke(); tx.setLineDash([]);
+    tx.fillStyle="#ffd76e"; tx.beginPath(); tx.arc(0,0,4.5,0,7); tx.fill(); tx.restore();
+    // 地面
+    tx.fillStyle="#0a0518"; tx.fillRect(0,352,TW,48);
+    tx.strokeStyle="rgba(120,90,190,.18)"; tx.lineWidth=1;
+    for(let i=0;i<8;i++){ const gy=362+i*6; tx.beginPath(); tx.moveTo(CX-220-i*30,gy); tx.lineTo(CX+220+i*30,gy); tx.stroke(); }
+    // 玩家兜帽剑士
+    tx.fillStyle="rgba(255,170,90,.25)"; tx.beginPath(); tx.ellipse(CX,392,46,9,0,0,7); tx.fill();
+    tx.save(); tx.translate(CX,386+Math.sin(t/480)*1.5); tx.scale(1.26,1.26); drawPlayerBody(0,0); tx.restore();
+    // 十 BOSS 徽记（两列弧线）
+    for(let i=0;i<10;i++){
+      const side = i<5?-1:1, j=i%5;
+      const mx2 = CX + side*(120+j*72), my2 = arcY[j] + Math.sin(t/620+i)*3;
+      const col = ringC[order[i]], fn = ENEMY_DRAW[order[i]];
+      let mg2=tx.createRadialGradient(mx2,my2,4,mx2,my2,32);
+      mg2.addColorStop(0,hexA(col,.3)); mg2.addColorStop(1,hexA(col,0));
+      tx.fillStyle=mg2; tx.beginPath(); tx.arc(mx2,my2,32,0,7); tx.fill();
+      tx.save(); tx.beginPath(); tx.arc(mx2,my2,27,0,7); tx.clip();
+      const bg=tx.createLinearGradient(0,my2-27,0,my2+27); bg.addColorStop(0,"#241a44"); bg.addColorStop(1,"#0c0820");
+      tx.fillStyle=bg; tx.fillRect(mx2-27,my2-27,54,54);
+      tx.translate(mx2,my2); tx.scale(.31,.31); fn(0,62);
+      tx.restore();
+      tx.strokeStyle=col; tx.lineWidth=2; tx.beginPath(); tx.arc(mx2,my2,27,0,7); tx.stroke();
+      // 层数牌
+      tx.fillStyle="#0c0820"; tx.strokeStyle="#ffd76e"; tx.lineWidth=1.2;
+      tx.beginPath(); tx.arc(mx2,my2-26,8,0,7); tx.fill(); tx.stroke();
+      tx.fillStyle="#ffd76e"; tx.font="bold 10px Microsoft YaHei"; tx.textAlign="center"; tx.textBaseline="middle";
+      tx.fillText(i+1, mx2, my2-26);
+      tx.textBaseline="alphabetic";
+    }
+    // 雾带
+    for(let k=0;k<2;k++){
+      tx.fillStyle=`rgba(150,110,210,${.05+.02*Math.sin(t/1300+k)})`;
+      tx.beginPath(); tx.ellipse(CX+Math.sin(t/2200+k)*60, 360-k*14, 360, 16, 0, 0, 7); tx.fill();
+    }
+    cx = gameCx;
+    titleRAF = requestAnimationFrame(render);
+  };
+  titleRAF = requestAnimationFrame(render);
 }
 function newRun(){
   meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0, combo:0, stance:"neutral" };
