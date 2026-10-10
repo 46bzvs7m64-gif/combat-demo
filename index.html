@@ -273,145 +273,401 @@ function drawBG(){
   cx.fillStyle = vg; cx.fillRect(0,0,W,H);
 }
 
-/* ---- 角色 ---- */
-function shadow(x,y,w){ cx.fillStyle="rgba(0,0,0,.45)"; cx.beginPath(); cx.ellipse(x,y+4,w,7,0,0,7); cx.fill(); }
+/* ---- 角色：共享分层图元 + 每层独立造型 ---- */
+const OUT = "#14101f";
+function shadow(x,y,w){ cx.fillStyle="rgba(0,0,0,.5)"; cx.beginPath(); cx.ellipse(x,y+4,w,7,0,0,7); cx.fill(); }
+const fc = (c,f) => f>0.05 ? "#f4f4ff" : c;
+function vgrad(y0,y1,c0,c1){ const g=cx.createLinearGradient(0,y0,0,y1); g.addColorStop(0,c0); g.addColorStop(1,c1); return g; }
+function poly(pts, fill){
+  cx.beginPath(); cx.moveTo(pts[0],pts[1]);
+  for(let i=2;i<pts.length;i+=2) cx.lineTo(pts[i],pts[i+1]);
+  cx.closePath(); cx.fillStyle=fill; cx.fill();
+  cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.lineJoin="round"; cx.stroke();
+}
+function limb(x1,y1,x2,y2,c,w){
+  w = w || 6.5;
+  cx.strokeStyle=OUT; cx.lineWidth=w+2.8; cx.lineCap="round";
+  cx.beginPath(); cx.moveTo(x1,y1); cx.lineTo(x2,y2); cx.stroke();
+  cx.strokeStyle=c; cx.lineWidth=w;
+  cx.beginPath(); cx.moveTo(x1,y1); cx.lineTo(x2,y2); cx.stroke();
+}
+function pauldron(x,y,c,r){
+  const g = vgrad(y-r,y+r,"#ffffff",c);
+  cx.fillStyle=fc(g,0); cx.beginPath(); cx.arc(x,y,r,0,7); cx.fill();
+  cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.stroke();
+}
+function glowEyes(x,y,color,gap,w,h){
+  cx.fillStyle=color;
+  cx.shadowColor=color; cx.shadowBlur=7;
+  rr(x-gap/2-w/2,y-h/2,w,h,2); cx.fill();
+  rr(x+gap/2-w/2,y-h/2,w,h,2); cx.fill();
+  cx.shadowBlur=0;
+}
+function belt(x,y,w,c){ cx.fillStyle=OUT; rr(x-w/2,y,w,7,2); cx.fill(); cx.fillStyle=c; rr(x-w/2,y+1,w,4,2); cx.fill(); cx.fillStyle="#e8d5a8"; rr(x-2.5,y+1,5,4,1); cx.fill(); }
+
+/* ===== 玩家：兜帽剑士（描边+渐变胸甲+披风+金格长剑） ===== */
 function drawPlayer(x,y){
-  const b = Math.sin(V.t/480)*2.5;
-  y += b - V.p.oy;
-  const gx = x - V.p.ghost*70;
-  if (V.p.ghost > 0.02){ cx.globalAlpha = V.p.ghost*0.5; drawPlayerBody(gx,y); cx.globalAlpha = 1; }
+  if ((V.p.visible==null?1:V.p.visible) <= 0.02) return;
+  cx.save(); cx.globalAlpha = V.p.visible==null?1:V.p.visible;
+  const bob = Math.sin(V.t/480)*2.5;
+  y += bob - V.p.oy;
+  if (V.p.ghost > 0.02){ cx.globalAlpha = (V.p.visible==null?1:V.p.visible)*V.p.ghost*0.45; drawPlayerBody(x - V.p.ghost*70, y); cx.globalAlpha = V.p.visible==null?1:V.p.visible; }
   drawPlayerBody(x,y);
   if (V.p.block > 0.02){
     cx.strokeStyle = `rgba(127,216,160,${V.p.block})`; cx.lineWidth = 4;
     cx.beginPath(); cx.arc(x+16, y-58, 34, -1.1, 1.1); cx.stroke();
+    cx.strokeStyle = `rgba(190,255,215,${V.p.block*0.55})`; cx.lineWidth = 1.5;
+    cx.beginPath(); cx.arc(x+16, y-58, 39, -1.1, 1.1); cx.stroke();
   }
+  cx.restore();
 }
 function drawPlayerBody(x,y){
   const f = V.p.flash;
-  cx.fillStyle = f>0.05?`rgba(${200+f*55|0},${60+f*100|0},${70+f*100|0},1)`:"#27314f";
-  cx.beginPath(); cx.moveTo(x-4,y-92); cx.quadraticCurveTo(x-30,y-60,x-20+Math.sin(V.t/300)*4,y-8);
-  cx.lineTo(x-2,y-14); cx.quadraticCurveTo(x-8,y-60,x+4,y-90); cx.fill();
-  cx.strokeStyle = "#2c3550"; cx.lineWidth = 7; cx.lineCap = "round";
-  cx.beginPath(); cx.moveTo(x-6,y-36); cx.lineTo(x-10,y-2); cx.moveTo(x+8,y-36); cx.lineTo(x+12,y-2); cx.stroke();
-  cx.fillStyle = f>0.05?"#fff":"#3b4a75"; rr(x-13,y-78,26,44,9); cx.fill();
-  cx.fillStyle = "#2c3550"; rr(x-13,y-56,26,8,3); cx.fill();
-  cx.fillStyle = f>0.05?"#fff":"#46588c"; cx.beginPath(); cx.arc(x,y-88,12,0,7); cx.fill();
-  cx.fillStyle = "#1c2338"; cx.beginPath(); cx.arc(x,y-90,12.5,Math.PI*0.9,Math.PI*2.1); cx.fill();
-  cx.fillStyle = "#7fd8ff"; cx.fillRect(x+2,y-90,5,3);
-  cx.save(); cx.translate(x+14,y-52); cx.rotate(-0.5+Math.sin(V.t/480)*0.06);
-  cx.fillStyle = "#c8d2e8"; cx.fillRect(-2,-58,4,58);
-  cx.fillStyle = "#8a93ad"; cx.fillRect(-8,-4,16,4); cx.fillRect(-2,0,4,10);
+  const sway = Math.sin(V.t/300)*4;
+  // 披风
+  poly([x-3,y-90, x-31+sway,y-58, x-21+sway,y-6, x-3,y-12, x+2,y-60], fc("#222b48",f));
+  cx.fillStyle = "#181f38"; poly2(x-3,y-90,x-31+sway,y-58,x-21+sway,y-6);
+  // 腿+靴
+  limb(x-6,y-32,x-10,y-6,"#2c3550",7); limb(x+7,y-32,x+11,y-6,"#2c3550",7);
+  cx.fillStyle=fc("#141828",f); rr(x-15,y-9,10,8,3); cx.fill(); rr(x+5,y-9,10,8,3); cx.fill();
+  // 后臂
+  limb(x-10,y-72,x-16,y-40,"#33405f",6);
+  // 躯干胸甲
+  poly([x-15,y-78, x+15,y-78, x+12,y-32, x-12,y-32], fc(vgrad(y-78,y-32,"#4d6094","#2b365c"),f));
+  cx.fillStyle=fc("#6b7db4",f); rr(x-4,y-70,8,22,3); cx.fill();      // 中脊
+  cx.fillStyle="#c9a35c"; cx.beginPath(); cx.arc(x,y-58,3.2,0,7); cx.fill(); // 金扣
+  belt(x,y-38,30);
+  // 肩甲
+  pauldron(x+15,y-74,fc("#54648f",f),7); pauldron(x-15,y-74,fc("#46547e",f),6);
+  // 头：兜帽+脸+护额
+  cx.fillStyle=fc("#26304e",f); cx.beginPath(); cx.arc(x,y-88,13.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.stroke();
+  cx.fillStyle=fc("#d8a984",f); cx.beginPath(); cx.arc(x+1,y-86,8.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.3; cx.stroke();
+  cx.fillStyle=OUT; cx.beginPath(); cx.arc(x,y-88,12.8,Math.PI*0.92,Math.PI*2.08); cx.fill();
+  cx.fillStyle="#7fd8ff"; cx.shadowColor="#7fd8ff"; cx.shadowBlur=6; rr(x+3,y-89,5,3,1.5); cx.fill(); cx.shadowBlur=0;
+  // 前臂+长剑（金格蓝刃）
+  const armSwing = Math.sin(V.t/480)*0.05;
+  limb(x+12,y-70,x+19,y-44,"#3a4a72",6);
+  cx.save(); cx.translate(x+20,y-44); cx.rotate(-0.42+armSwing);
+  cx.fillStyle="#3a2c18"; cx.fillRect(-2,0,4,10);
+  cx.fillStyle="#c9a35c"; rr(-9,-4,18,5,2); cx.fill();
+  const bg=cx.createLinearGradient(-3,-70,3,-70); bg.addColorStop(0,"#8ea0c8"); bg.addColorStop(.5,"#f2f6ff"); bg.addColorStop(1,"#8ea0c8");
+  cx.fillStyle=fc(bg,f); poly([-3,-4, 3,-4, 2,-72, 0,-78, -2,-72]);
   cx.restore();
-  cx.fillStyle = f>0.05?`rgba(255,${180+f*75|0},${180+f*75|0},1)`:"#7fd8a0";
-  cx.beginPath(); cx.arc(x+14,y-44,3.5,0,7); cx.fill();
 }
+function poly2(){ /* 披风内阴影（无描边三角） */
+  cx.beginPath(); cx.moveTo(arguments[0],arguments[1]);
+  for(let i=2;i<arguments.length;i+=2) cx.lineTo(arguments[i],arguments[i+1]);
+  cx.closePath(); cx.fill(); }
+
+/* ===== 敌人总控：每层独立缩放/造型 ===== */
+const ENEMY_SCALE = { guard:1.06, berserker:1.14, sorcerer:1.02, butcher:1.24, lord:1.34,
+  bloodfang:1.1, voidmage:1.06, golem:1.42, shadow:0.98, heart:1.38 };
+const ENEMY_DRAW = {
+  guard:dGuard, berserker:dBerserker, sorcerer:dSorcerer, butcher:dButcher, lord:dLord,
+  bloodfang:dBloodfang, voidmage:dVoidmage, golem:dGolem, shadow:dShadow, heart:dHeart
+};
 function drawEnemy(x,y){
+  if ((V.e.visible==null?1:V.e.visible) <= 0.02) return;
+  cx.save(); cx.globalAlpha = V.e.visible==null?1:V.e.visible;
   if (V.e.aura > 0.02){
-    const ag = cx.createRadialGradient(x,y-70,10,x,y-70,110);
+    const ag = cx.createRadialGradient(x,y-70,10,x,y-70,115);
     ag.addColorStop(0,`rgba(255,70,70,${0.35*V.e.aura})`); ag.addColorStop(1,"rgba(255,70,70,0)");
-    cx.fillStyle = ag; cx.beginPath(); cx.arc(x,y-70,110,0,7); cx.fill();
+    cx.fillStyle = ag; cx.beginPath(); cx.arc(x,y-70,115,0,7); cx.fill();
   }
-  const big = { lord:1.32, golem:1.38, heart:1.4, butcher:1.15 }[E.type] || 1.08;
-  cx.save(); cx.translate(x,y); cx.scale(big,big); cx.translate(-x,-y);
-  const f = V.e.flash, b = Math.sin(V.t/420 + 2)*2.5;
-  y += b;
-  if (E.type==="guard"||E.type==="butcher"||E.type==="golem") drawGuard(x,y,f,E.type);
-  else if (E.type==="berserker"||E.type==="bloodfang"||E.type==="shadow") drawBerserker(x,y,f,E.type);
-  else if (E.type==="sorcerer"||E.type==="voidmage") drawSorcerer(x,y,f,E.type);
-  else if (E.type==="lord") drawLord(x,y,f);
-  else drawHeart(x,y,f);
-  cx.restore();
+  const sc = ENEMY_SCALE[E.type] || 1.05;
+  cx.translate(x,y); cx.scale(sc,sc); cx.translate(-x,-y);
+  y += Math.sin(V.t/420 + 2)*2.5;
+  (ENEMY_DRAW[E.type] || dGuard)(x, y, V.e.flash);
   if (V.e.charge > 0.03){
-    const oy = y-120, r = 6+V.e.charge*16;
-    const og = cx.createRadialGradient(x,oy,1,x,oy,r+8);
-    og.addColorStop(0,"rgba(200,140,255,.95)"); og.addColorStop(1,"rgba(140,80,255,0)");
-    cx.fillStyle = og; cx.beginPath(); cx.arc(x,oy,r+8,0,7); cx.fill();
+    const oy = y-124, r = 6+V.e.charge*17;
+    const og = cx.createRadialGradient(x,oy,1,x,oy,r+9);
+    og.addColorStop(0,"rgba(220,150,255,.95)"); og.addColorStop(1,"rgba(140,80,255,0)");
+    cx.fillStyle = og; cx.beginPath(); cx.arc(x,oy,r+9,0,7); cx.fill();
   }
+  cx.restore();
 }
-function eLimbs(x,y,c2){ cx.strokeStyle = c2; cx.lineWidth = 8; cx.lineCap = "round";
-  cx.beginPath(); cx.moveTo(x-8,y-34); cx.lineTo(x-12,y-2); cx.moveTo(x+8,y-34); cx.lineTo(x+12,y-2); cx.stroke(); }
-function drawGuard(x,y,f,kind){
-  const body = kind==="golem" ? ["#6a6a58","#4a4a3c"] : kind==="butcher" ? ["#6e3a3a","#4a2424"] : ["#545e78","#3a4152"];
-  eLimbs(x,y,body[1]);
-  cx.fillStyle = f>0.05?"#fff":body[0]; rr(x-18,y-84,36,50,10); cx.fill();
-  cx.fillStyle = body[1]; rr(x-18,y-62,36,9,3); cx.fill();
-  cx.fillStyle = f>0.05?"#fff":body[0]; cx.beginPath(); cx.arc(x,y-94,13,0,7); cx.fill();
-  cx.fillStyle = "#181c28"; cx.fillRect(x-9,y-97,18,4);
-  cx.fillStyle = kind==="golem"?"#8affc0":kind==="butcher"?"#ff5a5a":"#ff9c5a";
-  cx.fillRect(x-6,y-96,4,2); cx.fillRect(x+3,y-96,4,2);
-  if (kind==="golem"){
-    cx.fillStyle = "#8a8a74";
-    for (let i=0;i<4;i++){ cx.beginPath(); cx.arc(x-12+i*8, y-70-(i%2)*14, 5, 0, 7); cx.fill(); }
-    cx.fillStyle = "#5a5a4a"; rr(x-26,y-66,52,10,4); cx.fill();
-  } else {
-    cx.fillStyle = "#6c7690"; cx.beginPath(); cx.arc(x-17,y-80,9,0,7); cx.arc(x+17,y-80,9,0,7); cx.fill();
-    cx.save(); cx.translate(x+24,y-46); cx.rotate(0.28);
-    cx.fillStyle = kind==="butcher"?"#d0b8b8":"#aeb8d0"; cx.fillRect(kind==="butcher"?-6:-3,kind==="butcher"?-64:-74,kind==="butcher"?12:6,kind==="butcher"?64:74);
-    cx.fillStyle = "#6c7690"; cx.fillRect(-11,-6,22,5); cx.fillRect(-3,-1,6,14);
-    cx.restore();
-  }
+
+/* 1) 回廊守卫：蓝钢骑士 · 全盔羽饰 · 鸢盾+武装剑 */
+function dGuard(x,y,f){
+  const sway = Math.sin(V.t/420)*3;
+  limb(x-7,y-30,x-10,y-6,"#39425c",7); limb(x+7,y-30,x+10,y-6,"#39425c",7);
+  cx.fillStyle=fc("#1a1e2c",f); rr(x-14,y-9,9,8,3); cx.fill(); rr(x+5,y-9,9,8,3); cx.fill();
+  // 锁子甲裙
+  cx.fillStyle=fc("#4a5470",f);
+  for(let i=0;i<4;i++){ cx.beginPath(); cx.arc(x-12+i*8, y-30, 5.5, 0, Math.PI); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.2; cx.stroke(); }
+  limb(x-14,y-74,x-22,y-52,"#4a5678",6);
+  poly([x-18,y-82, x+18,y-82, x+14,y-32, x-14,y-32], fc(vgrad(y-82,y-32,"#6b789c","#3d4660"),f));
+  cx.fillStyle="#c9a35c"; cx.beginPath(); cx.arc(x,y-58,4.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.2; cx.stroke();
+  belt(x,y-38,36);
+  pauldron(x-17,y-78,fc("#5a6688",f),8); pauldron(x+17,y-78,fc("#5a6688",f),8);
+  // 全盔+羽饰
+  cx.fillStyle=fc(vgrad(y-100,y-86,"#7a88ac","#4a5470"),f); rr(x-12,y-100,24,20,8); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.stroke();
+  cx.fillStyle="#10141f"; rr(x-8,y-93,16,4,2); cx.fill();
+  cx.fillStyle="#ffb060"; cx.shadowColor="#ff8a3a"; cx.shadowBlur=5; rr(x-5,y-92,4,2,1); cx.fill(); rr(x+1,y-92,4,2,1); cx.fill(); cx.shadowBlur=0;
+  cx.fillStyle="#ff8a3a"; cx.beginPath();
+  cx.moveTo(x-2,y-100); cx.quadraticCurveTo(x+2+sway,y-118,x+8+sway,y-124); cx.quadraticCurveTo(x+2+sway,y-112,x+4,y-100); cx.fill();
+  // 鸢盾
+  cx.fillStyle=fc(vgrad(y-72,y-36,"#5e6b8c","#39425c"),f);
+  poly([x-30,y-72, x-14,y-72, x-14,y-42, x-22,y-32, x-30,y-42]);
+  cx.fillStyle="#c9a35c"; cx.beginPath(); cx.arc(x-22,y-54,3,0,7); cx.fill();
+  // 武装剑
+  cx.save(); cx.translate(x+22,y-44); cx.rotate(-0.34);
+  cx.fillStyle="#3a2c18"; cx.fillRect(-2,0,4,9);
+  cx.fillStyle="#c9a35c"; rr(-8,-4,16,4.5,2); cx.fill();
+  const bg=cx.createLinearGradient(-2.5,-72,2.5,-72); bg.addColorStop(0,"#9aa6c4"); bg.addColorStop(.5,"#f4f8ff"); bg.addColorStop(1,"#9aa6c4");
+  cx.fillStyle=fc(bg,f); poly([-2.5,-4, 2.5,-4, 1.6,-68, 0,-74, -1.6,-68]);
+  cx.restore();
 }
-function drawBerserker(x,y,f,kind){
-  const body = kind==="bloodfang" ? ["#6a1a3a","#4a1228"] : kind==="shadow" ? ["#2a2a44","#1c1c30"] : ["#7a3030","#5a2222"];
-  eLimbs(x,y,body[1]);
-  cx.fillStyle = f>0.05?"#fff":body[0]; rr(x-15,y-80,30,46,10); cx.fill();
-  cx.fillStyle = body[1]; cx.beginPath(); cx.moveTo(x-15,y-80); cx.lineTo(x,y-96); cx.lineTo(x+15,y-80); cx.fill();
-  cx.fillStyle = f>0.05?"#fff":body[0]; cx.beginPath(); cx.arc(x,y-92,12,0,7); cx.fill();
-  cx.fillStyle = kind==="shadow"?"#c792ea":"#ffe08a"; cx.fillRect(x-7,y-94,4,3); cx.fillRect(x+3,y-94,4,3);
-  cx.strokeStyle = "#c8d2e8"; cx.lineWidth = 4;
-  [[-1,-1],[1,1]].forEach(([sx,rot])=>{
-    cx.save(); cx.translate(x+sx*20,y-52); cx.rotate(rot*0.5);
-    cx.beginPath(); cx.moveTo(0,0); cx.lineTo(0,-34); cx.stroke();
-    cx.fillStyle = "#b8c2da"; cx.beginPath(); cx.moveTo(0,-34); cx.quadraticCurveTo(sx*20,-30,sx*16,-14); cx.quadraticCurveTo(sx*8,-22,0,-22); cx.fill();
+
+/* 2) 血狂战士：赤膊毛皮 · 双角盔 · 战斧 */
+function dBerserker(x,y,f){
+  limb(x-8,y-28,x-12,y-4,"#5a3620",7); limb(x+8,y-28,x+12,y-4,"#5a3620",7);
+  cx.fillStyle=fc("#2e1c10",f); rr(x-15,y-8,10,8,3); cx.fill(); rr(x+5,y-8,10,8,3); cx.fill();
+  // 毛皮裙
+  cx.fillStyle=fc("#7a3a26",f);
+  for(let i=0;i<5;i++){ cx.beginPath(); cx.moveTo(x-15+i*7.5,y-30); cx.lineTo(x-12+i*7.5,y-14); cx.lineTo(x-9+i*7.5,y-30); cx.fill(); }
+  // 赤膊（皮肤渐变）+皮束带
+  poly([x-16,y-80, x+16,y-80, x+13,y-34, x-13,y-34], fc(vgrad(y-80,y-34,"#d29874","#a86848"),f));
+  cx.fillStyle="#5a3620"; poly([x-16,y-80, x-4,y-80, x-7,y-34, x-13,y-34]);
+  cx.fillStyle="#3a2414"; rr(x-13,y-52,26,6,2); cx.fill();
+  cx.fillStyle="#c9a35c"; cx.fillRect(x-3,y-52,6,6);
+  // 毛皮肩
+  pauldron(x-16,y-78,fc("#9a4a30",f),8); pauldron(x+16,y-78,fc("#8a4028",f),8);
+  cx.fillStyle=fc("#6e3020",f);
+  [[-16,-80],[16,-80]].forEach(([sx,sy])=>{ cx.beginPath(); cx.moveTo(sx,sy-4); cx.lineTo(sx-5,sy+2); cx.lineTo(sx-1,sy+5); cx.lineTo(sx+5,sy+2); cx.lineTo(sx+1,sy-4); cx.fill(); });
+  // 双角盔
+  cx.fillStyle=fc("#8a8a92",f); cx.beginPath(); cx.arc(x,y-90,11,Math.PI,0); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.stroke();
+  cx.fillStyle=fc("#e8d8c0",f);
+  poly([x-9,y-94, x-24,y-110, x-19,y-96]); poly([x+9,y-94, x+24,y-110, x+19,y-96]);
+  glowEyes(x,y-88,"#ffd060",9,4,3);
+  // 战斧
+  limb(x+13,y-72,x+20,y-46,"#a86848",6);
+  cx.save(); cx.translate(x+22,y-48); cx.rotate(-0.5);
+  cx.strokeStyle=OUT; cx.lineWidth=7; cx.beginPath(); cx.moveTo(0,8); cx.lineTo(0,-46); cx.stroke();
+  cx.strokeStyle="#5a3620"; cx.lineWidth=4.5; cx.beginPath(); cx.moveTo(0,8); cx.lineTo(0,-46); cx.stroke();
+  cx.fillStyle=fc("#c4ccdc",f); poly([0,-52, 26,-46, 22,-30, 6,-34, 0,-38]);
+  cx.restore();
+}
+
+/* 3) 咒术师：尖帽长袍 · 苍白面具 · 浮空宝珠法杖 */
+function dSorcerer(x,y,f){
+  // 长袍（拖地）
+  poly([x-10,y-92, x+10,y-92, x+25,y-2, x-25,y-2], fc(vgrad(y-92,y-2,"#54387e","#2c1d46"),f));
+  cx.fillStyle="#c9a35c"; poly([x-25,y-2, x+25,y-2, x+21,y-9, x-21,y-9]);
+  // 长袍前襟纹
+  cx.strokeStyle="rgba(201,163,92,.55)"; cx.lineWidth=1.4;
+  cx.beginPath(); cx.moveTo(x,y-88); cx.lineTo(x,y-12); cx.stroke();
+  for(let i=0;i<3;i++){ cx.beginPath(); cx.moveTo(x-7,y-40-i*16); cx.lineTo(x+7,y-40-i*16); cx.stroke(); }
+  // 兜帽+面具
+  cx.fillStyle=fc("#3a2658",f); cx.beginPath(); cx.arc(x,y-92,12,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.6; cx.stroke();
+  cx.fillStyle=fc("#e8e0d0",f); cx.beginPath(); cx.arc(x,y-90,7.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.2; cx.stroke();
+  glowEyes(x,y-91,"#c98aff",8,3.5,2.6);
+  // 尖帽
+  cx.fillStyle=fc("#322051",f); poly([x-13,y-98, x+13,y-98, x+3,y-126, x-2,y-126]);
+  cx.fillStyle="#c9a35c"; cx.fillRect(x-13,y-100,26,4);
+  // 法杖+浮空宝珠
+  cx.save(); cx.translate(x-24,y-12); cx.rotate(0.12);
+  cx.strokeStyle=OUT; cx.lineWidth=6.5; cx.beginPath(); cx.moveTo(0,8); cx.lineTo(0,-78); cx.stroke();
+  cx.strokeStyle="#6a4f2a"; cx.lineWidth=4; cx.beginPath(); cx.moveTo(0,8); cx.lineTo(0,-78); cx.stroke();
+  cx.restore();
+  const orbY = y-96 + Math.sin(V.t/220)*3;
+  const og=cx.createRadialGradient(x-27,orbY,1,x-27,orbY,11);
+  og.addColorStop(0,"#f0d8ff"); og.addColorStop(.5,"#b87aff"); og.addColorStop(1,"rgba(120,60,200,0)");
+  cx.fillStyle=og; cx.beginPath(); cx.arc(x-27,orbY,11,0,7); cx.fill();
+}
+
+/* 4) 碎铠屠夫：壮硕 · 血污围裙 · 半铁面 · 巨型菜刀 */
+function dButcher(x,y,f){
+  limb(x-10,y-26,x-15,y-4,"#4a2424",8); limb(x+10,y-26,x+15,y-4,"#4a2424",8);
+  cx.fillStyle=fc("#241010",f); rr(x-18,y-8,11,8,3); cx.fill(); rr(x+7,y-8,11,8,3); cx.fill();
+  // 粗壮躯干（暗红毛衣）
+  poly([x-21,y-82, x+21,y-82, x+17,y-30, x-17,y-30], fc(vgrad(y-82,y-30,"#8a4440","#5a2828"),f));
+  // 血污围裙
+  cx.fillStyle=fc("#d8c8b0",f); poly([x-15,y-70, x+15,y-70, x+12,y-12, x-12,y-12]);
+  cx.fillStyle="#a83030";
+  cx.beginPath(); cx.arc(x-6,y-40,2.5,0,7); cx.arc(x+7,y-28,2,0,7); cx.arc(x-2,y-18,1.6,0,7); cx.fill();
+  cx.fillStyle="#3a2414"; rr(x-15,y-70,30,6,2); cx.fill();
+  pauldron(x-20,y-78,fc("#6a3434",f),8);
+  // 光头+半铁面+疤
+  cx.fillStyle=fc("#d8a87e",f); cx.beginPath(); cx.arc(x,y-92,12.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.6; cx.stroke();
+  cx.fillStyle=fc("#5a606e",f); poly([x-12,y-96, x+2,y-100, x+2,y-84, x-12,y-86]);
+  cx.fillStyle="#1a1010"; rr(x+4,y-93,5,3,1.5); cx.fill();
+  cx.strokeStyle="#8a4030"; cx.lineWidth=1.4; cx.beginPath(); cx.moveTo(x+8,y-100); cx.lineTo(x+5,y-86); cx.stroke();
+  // 巨型菜刀
+  limb(x+16,y-72,x+24,y-48,"#6a3434",7);
+  cx.save(); cx.translate(x+26,y-50); cx.rotate(-0.32);
+  cx.fillStyle="#3a2c18"; cx.fillRect(-3,0,6,16);
+  const cg=cx.createLinearGradient(-14,-30,14,-30); cg.addColorStop(0,"#9aa4b4"); cg.addColorStop(.5,"#e8eef8"); cg.addColorStop(1,"#9aa4b4");
+  cx.fillStyle=fc(cg,f); poly([-4,-4, 30,-4, 30,-32, 10,-36, -4,-28]);
+  cx.fillStyle="#707a8a"; cx.fillRect(-4,-10,34,2.5);
+  cx.restore();
+}
+
+/* 5) 回廊之主：黑金国王 · 王冠破披风 · 双手大剑 */
+function dLord(x,y,f){
+  const sway = Math.sin(V.t/360)*5;
+  poly([x-4,y-96, x-44+sway,y-60, x-32+sway,y-2, x-4,y-10, x+3,y-62], fc("#3a1030",f));
+  limb(x-7,y-30,x-11,y-4,"#2c2440",7); limb(x+7,y-30,x+11,y-4,"#2c2440",7);
+  cx.fillStyle=fc("#181226",f); rr(x-14,y-8,10,8,3); cx.fill(); rr(x+4,y-8,10,8,3); cx.fill();
+  limb(x-14,y-74,x-22,y-50,"#3a3054",6); limb(x+14,y-74,x+22,y-50,"#3a3054",6);
+  poly([x-19,y-84, x+19,y-84, x+15,y-32, x-15,y-32], fc(vgrad(y-84,y-32,"#544876","#302848"),f));
+  cx.fillStyle="#ffd76e"; poly([x-19,y-60, x+19,y-60, x+17,y-55, x-17,y-55]);
+  belt(x,y-38,38);
+  pauldron(x-19,y-80,fc("#463a64",f),9); pauldron(x+19,y-80,fc("#463a64",f),9);
+  cx.fillStyle=fc(vgrad(y-102,y-84,"#64568a","#3e3460"),f); cx.beginPath(); cx.arc(x,y-92,13,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.stroke();
+  cx.fillStyle="#140e1e"; rr(x-9,y-96,18,5,2); cx.fill();
+  glowEyes(x,y-95,"#ff5a7a",10,5,3);
+  cx.fillStyle="#ffd76e"; poly([x-13,y-104, x-13,y-115, x-7,y-107, x-1,y-118, x+5,y-107, x+11,y-115, x+11,y-104]);
+  cx.save(); cx.translate(x+26,y-46); cx.rotate(-0.18);
+  const lg=cx.createLinearGradient(-4,0,4,0); lg.addColorStop(0,"#8a7aa8"); lg.addColorStop(.5,"#f4f8ff"); lg.addColorStop(1,"#8a7aa8");
+  cx.fillStyle=fc(lg,f); poly([-4,-2, 4,-2, 3,-96, 0,-104, -3,-96]);
+  cx.fillStyle="#ffd76e"; rr(-13,-6,26,6,2); cx.fill();
+  cx.fillStyle="#2a1c10"; cx.fillRect(-3,0,6,12);
+  cx.restore();
+}
+
+/* 6) 血牙领主：高领猩红披风 · 苍白贵族 · 细剑+红宝石 */
+function dBloodfang(x,y,f){
+  const sway = Math.sin(V.t/380)*4;
+  // 高领披风
+  poly([x-8,y-90, x-34+sway,y-66, x-26+sway,y-2, x-6,y-8], fc(vgrad(y-90,y-2,"#9a1828","#5a0c18"),f));
+  poly([x+8,y-90, x+34+sway,y-66, x+26+sway,y-2, x+6,y-8], fc(vgrad(y-90,y-2,"#8a1424","#4a0a14"),f));
+  limb(x-7,y-30,x-10,y-6,"#1c1624",7); limb(x+7,y-30,x+10,y-6,"#1c1624",7);
+  cx.fillStyle=fc("#0c0814",f); rr(x-13,y-9,9,8,3); cx.fill(); rr(x+4,y-9,9,8,3); cx.fill();
+  poly([x-14,y-82, x+14,y-82, x+11,y-32, x-11,y-32], fc(vgrad(y-82,y-32,"#322a40","#1a1428"),f));
+  // 立领
+  cx.fillStyle=fc("#6a0e1c",f); poly([x-14,y-82, x-4,y-98, x-2,y-80]); poly([x+14,y-82, x+4,y-98, x+2,y-80]);
+  cx.fillStyle="#ff3a5a"; cx.shadowColor="#ff3a5a"; cx.shadowBlur=7; cx.beginPath(); cx.arc(x,y-60,4,0,7); cx.fill(); cx.shadowBlur=0;
+  cx.fillStyle="#14101c"; poly([x-14,y-78, x+14,y-78, x+12,y-72, x-12,y-72]);
+  // 苍白脸+尖牙+黑发
+  cx.fillStyle=fc("#1c1424",f); cx.beginPath(); cx.arc(x,y-92,12,0,7); cx.fill();
+  cx.fillStyle=fc("#ece0d4",f); cx.beginPath(); cx.arc(x,y-90,8.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.3; cx.stroke();
+  cx.fillStyle="#14101c"; cx.beginPath(); cx.arc(x,y-96,8.5,Math.PI,0); cx.fill();
+  glowEyes(x,y-92,"#ff4a6a",9,4,2.6);
+  cx.fillStyle="#fff"; cx.fillRect(x-3,y-85,2,3); cx.fillRect(x+1,y-85,2,3);
+  // 细剑
+  cx.save(); cx.translate(x+20,y-46); cx.rotate(-0.3);
+  cx.fillStyle="#2a1c10"; cx.fillRect(-1.5,0,3,10);
+  cx.fillStyle="#c9a35c"; rr(-7,-3,14,3.5,1.5); cx.fill();
+  const rg=cx.createLinearGradient(-1.5,-90,1.5,-90); rg.addColorStop(0,"#aab4cc"); rg.addColorStop(.5,"#ffffff"); rg.addColorStop(1,"#aab4cc");
+  cx.fillStyle=fc(rg,f); cx.fillRect(-1.2,-3,2.4,-88);
+  cx.restore();
+}
+
+/* 7) 虚空咒师：星纹深蓝袍 · 鹿角冠 · 旋转符文环 */
+function dVoidmage(x,y,f){
+  poly([x-11,y-94, x+11,y-94, x+26,y-2, x-26,y-2], fc(vgrad(y-94,y-2,"#28386e","#101a38"),f));
+  // 星座纹
+  cx.strokeStyle="rgba(150,190,255,.7)"; cx.lineWidth=1.1;
+  cx.beginPath(); cx.moveTo(x-8,y-30); cx.lineTo(x-2,y-48); cx.lineTo(x+7,y-40); cx.lineTo(x+10,y-62); cx.stroke();
+  cx.fillStyle="#a8c8ff"; [[-8,-30],[-2,-48],[7,-40],[10,-62]].forEach(([dx,dy])=>{ cx.beginPath(); cx.arc(x+dx,y+dy,1.6,0,7); cx.fill(); });
+  cx.fillStyle=fc("#e8e0d0",f); cx.beginPath(); cx.arc(x,y-92,7.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.2; cx.stroke();
+  glowEyes(x,y-93,"#6aa8ff",8,3.5,2.6);
+  // 兜帽+鹿角冠
+  cx.fillStyle=fc("#1a2650",f); cx.beginPath(); cx.arc(x,y-94,12,Math.PI,0); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.6; cx.stroke();
+  cx.strokeStyle=fc("#9ab3e0",f); cx.lineWidth=2.4; cx.lineCap="round";
+  [-1,1].forEach(s=>{ cx.beginPath(); cx.moveTo(x+s*6,y-102);
+    cx.quadraticCurveTo(x+s*20,y-112, x+s*24,y-128);
+    cx.quadraticCurveTo(x+s*18,y-116, x+s*12,y-114);
+    cx.stroke(); });
+  // 旋转符文环
+  const rr2 = 13, sp = V.t/300;
+  cx.strokeStyle="rgba(120,170,255,.8)"; cx.lineWidth=1.6;
+  cx.beginPath(); cx.arc(x+22,y-52,rr2,sp,sp+Math.PI*1.3); cx.stroke();
+  cx.beginPath(); cx.arc(x+22,y-52,rr2+5,-sp,-sp+Math.PI*0.9); cx.stroke();
+  // 法杖蓝珠
+  cx.save(); cx.translate(x-24,y-12); cx.rotate(0.1);
+  cx.strokeStyle=OUT; cx.lineWidth=6; cx.beginPath(); cx.moveTo(0,8); cx.lineTo(0,-76); cx.stroke();
+  cx.strokeStyle="#3a4a6e"; cx.lineWidth=3.6; cx.beginPath(); cx.moveTo(0,8); cx.lineTo(0,-76); cx.stroke();
+  cx.restore();
+  const og=cx.createRadialGradient(x-26,y-84,1,x-26,y-84,11);
+  og.addColorStop(0,"#d8ecff"); og.addColorStop(.5,"#5a9cff"); og.addColorStop(1,"rgba(40,90,200,0)");
+  cx.fillStyle=og; cx.beginPath(); cx.arc(x-26,y-84+Math.sin(V.t/200)*3,11,0,7); cx.fill();
+}
+
+/* 8) 磐岩傀儡：方块岩石躯 · 翠晶裂缝 · 巨锤拳 */
+function dGolem(x,y,f){
+  // 方腿
+  cx.fillStyle=fc("#47453a",f); poly([x-16,y-30, x-4,y-30, x-6,y-2, x-18,y-2]); poly([x+4,y-30, x+16,y-30, x+18,y-2, x+6,y-2]);
+  cx.fillStyle=fc("#2e2c24",f); rr(x-19,y-8,13,7,2); cx.fill(); rr(x+6,y-8,13,7,2); cx.fill();
+  // 巨岩躯干
+  poly([x-24,y-86, x+24,y-86, x+21,y-32, x-21,y-32], fc(vgrad(y-86,y-32,"#7a7868","#4a483c"),f));
+  // 翠晶裂缝
+  cx.strokeStyle="#7dffb8"; cx.shadowColor="#3aff9c"; cx.shadowBlur=6; cx.lineWidth=2;
+  cx.beginPath(); cx.moveTo(x-10,y-84); cx.lineTo(x-4,y-66); cx.lineTo(x-12,y-52); cx.lineTo(x-6,y-36); cx.stroke();
+  cx.beginPath(); cx.moveTo(x+12,y-82); cx.lineTo(x+7,y-64); cx.lineTo(x+14,y-50); cx.stroke();
+  cx.shadowBlur=0;
+  cx.fillStyle="#2e2c24"; rr(x-24,y-56,48,7,2); cx.fill();
+  // 巨臂（右，石拳）
+  limb(x+20,y-80,x+30,y-52,"#5a584a",9);
+  cx.fillStyle=fc("#6a6858",f); rr(x+22,y-52,18,18,5); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.stroke();
+  cx.fillStyle="#7dffb8"; cx.fillRect(x+30,y-46,4,6);
+  // 左臂短粗
+  limb(x-20,y-80,x-26,y-54,"#5a584a",9);
+  // 石头颅（无脸，符文眼缝）
+  cx.fillStyle=fc(vgrad(y-104,y-86,"#747262","#4a483c"),f); poly([x-13,y-104, x+13,y-104, x+11,y-86, x-11,y-86]);
+  cx.fillStyle="#7dffb8"; cx.shadowColor="#3aff9c"; cx.shadowBlur=7; rr(x-7,y-98,14,3.5,1.5); cx.fill(); cx.shadowBlur=0;
+  cx.fillStyle=fc("#5a584a",f); cx.beginPath(); cx.moveTo(x-9,y-104); cx.lineTo(x-6,y-112); cx.lineTo(x-3,y-104); cx.fill();
+  cx.beginPath(); cx.moveTo(x+9,y-104); cx.lineTo(x+6,y-112); cx.lineTo(x+3,y-104); cx.fill();
+}
+
+/* 9) 影刃刺客：前倾紧身 · 长围巾 · 双匕首 */
+function dShadow(x,y,f){
+  const lean = 6;
+  // 飘长围巾
+  poly([x-4,y-88, x-40+Math.sin(V.t/260)*8,y-80, x-34+Math.sin(V.t/220)*10,y-66, x-6,y-64], fc("#3a2a66",f));
+  limb(x-5,y-30,x-12,y-6,"#15152c",6.5); limb(x+8,y-30,x+4,y-6,"#15152c",6.5);
+  cx.fillStyle=fc("#0a0818",f); rr(x-16,y-9,9,7,3); cx.fill(); rr(x+2,y-9,9,7,3); cx.fill();
+  poly([x-12+lean,y-82, x+14+lean,y-82, x+12+lean,y-34, x-10+lean,y-34], fc(vgrad(y-82,y-34,"#2e2e56","#161630"),f));
+  cx.fillStyle="#c792ea"; cx.fillRect(x-2+lean,y-70,3,22);
+  belt(x+lean,y-40,26);
+  // 兜帽+面罩
+  cx.fillStyle=fc("#1e1e40",f); cx.beginPath(); cx.arc(x+lean,y-92,11.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.6; cx.stroke();
+  cx.fillStyle=fc("#2a2440",f); rr(x+lean-7,y-90,14,9,4); cx.fill();
+  glowEyes(x+lean,y-93,"#c792ea",8,4,2.6);
+  // 双匕首（交叉持于身前）
+  [[-0.5,-1],[0.5,1]].forEach(([s,rot])=>{
+    cx.save(); cx.translate(x-6+lean,y-52); cx.rotate(s*0.9);
+    cx.fillStyle="#1c1428"; cx.fillRect(-1.5,0,3,7);
+    cx.fillStyle="#6a5a8a"; rr(-5,-3,10,3,1.5); cx.fill();
+    const dg=cx.createLinearGradient(-2,-46,2,-46); dg.addColorStop(0,"#8a7cb8"); dg.addColorStop(.5,"#e8e0ff"); dg.addColorStop(1,"#8a7cb8");
+    cx.fillStyle=fc(dg,f); poly([-2,-3, 2,-3, 1.4,-42, 0,-48, -1.4,-42]);
     cx.restore();
   });
 }
-function drawSorcerer(x,y,f,kind){
-  const body = kind==="voidmage" ? ["#1e2a5e","#141c42"] : ["#3d2a5e","#2a1c42"];
-  cx.fillStyle = f>0.05?"#fff":body[0];
-  cx.beginPath(); cx.moveTo(x,y-108); cx.lineTo(x+24,y-2); cx.lineTo(x-24,y-2); cx.closePath(); cx.fill();
-  cx.fillStyle = body[1]; cx.beginPath(); cx.moveTo(x,y-108); cx.lineTo(x+13,y-72); cx.lineTo(x-13,y-72); cx.fill();
-  cx.fillStyle = kind==="voidmage"?"#8ab3ff":"#b3a1e8"; cx.fillRect(x-6,y-92,4,2.5); cx.fillRect(x+2,y-92,4,2.5);
-  cx.save(); cx.translate(x-24,y-40); cx.rotate(0.15);
-  cx.strokeStyle = "#5a4a2a"; cx.lineWidth = 4; cx.beginPath(); cx.moveTo(0,10); cx.lineTo(0,-64); cx.stroke();
-  cx.fillStyle = kind==="voidmage"?"#6a9cff":"#c792ea"; cx.beginPath(); cx.arc(0,-70,6+Math.sin(V.t/200)*1.5,0,7); cx.fill();
-  cx.restore();
-}
-function drawLord(x,y,f){
-  cx.fillStyle = "#3a1030";
-  cx.beginPath(); cx.moveTo(x-6,y-96); cx.quadraticCurveTo(x-42,y-64,x-30,y-4); cx.lineTo(x-4,y-12); cx.quadraticCurveTo(x-14,y-64,x+4,y-94); cx.fill();
-  eLimbs(x,y,"#2c2438");
-  cx.fillStyle = f>0.05?"#fff":"#463a5e"; rr(x-19,y-86,38,52,11); cx.fill();
-  cx.fillStyle = "#c792ea"; rr(x-19,y-58,38,7,3); cx.fill();
-  cx.fillStyle = f>0.05?"#fff":"#544674"; cx.beginPath(); cx.arc(x,y-98,14,0,7); cx.fill();
-  cx.fillStyle = "#181420"; cx.fillRect(x-10,y-102,20,5);
-  cx.fillStyle = "#ff5a7a"; cx.fillRect(x-7,y-101,5,3); cx.fillRect(x+3,y-101,5,3);
-  cx.fillStyle = "#ffd76e";
-  cx.beginPath(); cx.moveTo(x-12,y-108); cx.lineTo(x-12,y-118); cx.lineTo(x-6,y-111); cx.lineTo(x,y-121); cx.lineTo(x+6,y-111); cx.lineTo(x+12,y-118); cx.lineTo(x+12,y-108); cx.closePath(); cx.fill();
-  cx.save(); cx.translate(x+27,y-48); cx.rotate(0.22);
-  cx.fillStyle = "#d8e0f0"; cx.fillRect(-4,-92,8,92);
-  cx.fillStyle = "#8a7aa8"; cx.fillRect(-14,-8,28,6); cx.fillRect(-4,-2,8,16);
-  cx.restore();
-  cx.fillStyle = f>0.05?"#fff":"#6c5a94"; cx.beginPath(); cx.arc(x-19,y-82,10,0,7); cx.arc(x+19,y-82,10,0,7); cx.fill();
-}
-function drawHeart(x,y,f){
+
+/* 10) 回廊之心：四阶段 · 心核茧+四浮游刃+王冠人影 */
+function dHeart(x,y,f){
   const ph = E.phase||1;
-  cx.fillStyle = ph>=3 ? "#4a0e2a" : "#38102e";
-  cx.beginPath(); cx.moveTo(x,y-118); cx.quadraticCurveTo(x+56,y-70,x+44,y-6);
-  cx.quadraticCurveTo(x,y+10,x-44,y-6); cx.quadraticCurveTo(x-56,y-70,x,y-118); cx.fill();
-  cx.strokeStyle = "#c792ea"; cx.lineWidth = 3;
-  cx.beginPath(); cx.moveTo(x,y-118); cx.quadraticCurveTo(x+56,y-70,x+44,y-6); cx.stroke();
-  cx.beginPath(); cx.moveTo(x,y-118); cx.quadraticCurveTo(x-56,y-70,x-44,y-6); cx.stroke();
-  const pulse = 1 + Math.sin(V.t/260)*0.12;
-  const hg = cx.createRadialGradient(x,y-62,4,x,y-62,26*pulse);
-  hg.addColorStop(0, ph>=3?"#ffb0c8":"#ff8aa8"); hg.addColorStop(.6, ph>=3?"#ff3a6a":"#c92a5a"); hg.addColorStop(1,"rgba(120,20,50,0)");
-  cx.fillStyle = hg; cx.beginPath(); cx.arc(x,y-62,26*pulse,0,7); cx.fill();
-  cx.fillStyle = "#ffd76e";
-  [[-16,-98],[16,-98],[0,-116]].forEach(([ox,oy])=>{ cx.beginPath(); cx.moveTo(x+ox,y+oy+6); cx.lineTo(x+ox,y+oy); cx.lineTo(x+ox+4,y+oy+7); cx.fill(); });
+  // 四把浮游刃环绕
+  for(let i=0;i<4;i++){
+    const a = V.t/500 + i*Math.PI/2 + (ph>=3?V.t/180:0);
+    const bx = x + Math.cos(a)*58, by = y-64 + Math.sin(a)*30;
+    cx.save(); cx.translate(bx,by); cx.rotate(a+Math.PI/2);
+    cx.fillStyle=fc("#b8a8d8",f); poly([0,-12, 4,0, 0,12, -4,0]);
+    cx.fillStyle="#ff5a7a"; cx.beginPath(); cx.arc(0,0,2,0,7); cx.fill();
+    cx.restore();
+  }
+  // 心核茧
+  poly([x,y-120, x+58,y-72, x+46,y-4, x,y+12, x-46,y-4, x-58,y-72],
+       fc(ph>=3 ? vgrad(y-120,y,"#6a1438","#2e0820") : vgrad(y-120,y,"#4a1038","#26081e"), f));
+  cx.strokeStyle="#c792ea"; cx.lineWidth=2.5;
+  cx.beginPath(); cx.moveTo(x,y-120); cx.quadraticCurveTo(x+58,y-72,x+46,y-4); cx.stroke();
+  cx.beginPath(); cx.moveTo(x,y-120); cx.quadraticCurveTo(x-58,y-72,x-46,y-4); cx.stroke();
   if (ph>=2){
     cx.strokeStyle = `rgba(255,90,120,${.4+.3*Math.sin(V.t/150)})`; cx.lineWidth = 2;
-    for (let i=0;i<3;i++){ cx.beginPath(); cx.ellipse(x,y-62,34+i*10,46+i*8,0,0,7); cx.stroke(); }
+    for (let i=0;i<3;i++){ cx.beginPath(); cx.ellipse(x,y-62,36+i*10,48+i*8,0,0,7); cx.stroke(); }
   }
+  // 茧中王冠人影
+  const pulse = 1 + Math.sin(V.t/240)*0.12;
+  const hg = cx.createRadialGradient(x,y-62,4,x,y-62,24*pulse);
+  hg.addColorStop(0, ph>=3?"#ffc8d8":"#ff9ab8"); hg.addColorStop(.6, ph>=3?"#ff3a6a":"#c92a5a"); hg.addColorStop(1,"rgba(120,20,50,0)");
+  cx.fillStyle = hg; cx.beginPath(); cx.arc(x,y-62,24*pulse,0,7); cx.fill();
+  cx.fillStyle="rgba(20,6,16,.85)";
+  cx.beginPath(); cx.arc(x,y-66,7,0,7); cx.fill();
+  poly([x-9,y-58, x+9,y-58, x+7,y-34, x-7,y-34]);
+  cx.fillStyle="#ffd76e"; poly([x-8,y-72, x-8,y-79, x-4,y-73, x,y-81, x+4,y-73, x+8,y-79, x+8,y-72]);
+  glowEyes(x,y-67,"#ff5a7a",7,3,2.2);
 }
 
 /* ---- 头顶条 + 意图预告 ---- */
@@ -433,7 +689,7 @@ function intentText(){
 }
 function drawHUD(){
   if (!S || !E) return;
-  const px = P_BASE.x + V.p.ox, ex = E_BASE.x + V.e.ox;
+  const px = P_BASE.x + V.p.ox + (V.p.kb||0), ex = E_BASE.x + V.e.ox + (V.e.kb||0);
   const it = intentText();
   if (it){ cx.font = "bold 11px Microsoft YaHei"; cx.fillStyle = "#ffd76e"; cx.fillText("下回合 ▸ " + it, ex, 92); }
   drawBar(px, 158, 150, Dp.hp/playerMaxHp(), "#e04a4a", `玩家 ${Math.ceil(Dp.hp)}/${playerMaxHp()}`);
@@ -491,7 +747,7 @@ function loop(ts){
   slashTrail = slashTrail.filter(s => (s.life -= dt*0.006) > 0);
   drawBG();
   if (S && E){
-    const px = P_BASE.x + V.p.ox + V.p.kb, ex = E_BASE.x + V.e.ox + V.e.kb;
+    const px = P_BASE.x + V.p.ox + (V.p.kb||0), ex = E_BASE.x + V.e.ox + (V.e.kb||0);
     shadow(px, P_BASE.y, 26); shadow(ex, E_BASE.y, 30);
     if (V.proj.show > 0){
       const pg = cx.createRadialGradient(V.proj.x,V.proj.y,1,V.proj.x,V.proj.y,V.proj.r+6);
@@ -612,10 +868,10 @@ function startFloor(){
         p:{ hp:playerMaxHp(), st:playerMaxSt(), guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0} },
         stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
   Dp.hp = S.p.hp; Dp.st = S.p.st; De.hp = E.hp; De.poise = E.poise; De.shd = E.shield;
-  V.p = { ox:0, oy:0, flash:0, ghost:0, block:0, visible:1 };
-  V.e = { ox:0, flash:0, visible:1, aura:0, charge:0 };
-  V.dim = 0; V.fullflash = 0;
-  particles = []; floaters = [];
+  V.p = { ox:0, oy:0, flash:0, ghost:0, block:0, visible:1, kb:0 };
+  V.e = { ox:0, flash:0, visible:1, aura:0, charge:0, kb:0, telegraph:0 };
+  V.dim = 0; V.fullflash = 0; V.slash.show = 0; V.hitstop = 0;
+  particles = []; floaters = []; afterimages = []; slashTrail = [];
   document.getElementById("log").innerHTML = "";
   sysLog(`—— 第 ${meta.floor} 层 · ${E.name}【${E.desc}】挡在回廊深处 ——`);
   if (E.affix) sysLog(`⚠ 精英词缀：${E.affixName}`);
