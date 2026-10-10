@@ -191,16 +191,16 @@
 "use strict";
 /* ==================== 敌人总表（含各层独有技能标记） ==================== */
 const ENEMIES = {
-  guard:    { name:"回廊守卫",   hp:170, atk:10, def:25, poise:55,  desc:"标准重甲" },
-  berserker:{ name:"血狂战士",   hp:140, atk:13, def:10, poise:40,  desc:"低血嗜血双动" },
-  sorcerer: { name:"咒术师",     hp:150, atk:12, def:15, poise:65,  shield:.22, desc:"护盾+蓄力" },
-  butcher:  { name:"碎铠屠夫",   hp:190, atk:14, def:20, poise:70,  debuffOnHit:true, desc:"攻击附带碎甲" },
-  lord:     { name:"回廊之主",   hp:260, atk:13, def:25, poise:95,  desc:"三阶段王权" },
-  bloodfang:{ name:"血牙领主",   hp:200, atk:15, def:18, poise:60,  lifesteal:.4, desc:"攻击吸血 40%" },
-  voidmage: { name:"虚空咒师",   hp:210, atk:14, def:18, poise:70,  shield:.25, blink:.25, desc:"闪现规避+双蓄力" },
-  golem:    { name:"磐岩傀儡",   hp:230, atk:12, def:40, poise:150, thorns:.22, desc:"反伤甲+极高韧性" },
-  shadow:   { name:"影刃刺客",   hp:170, atk:16, def:15, poise:50,  blink:.2, swift:true, desc:"迅捷追击+闪避" },
-  heart:    { name:"回廊之心",   hp:330, atk:15, def:28, poise:120, lifesteal:.25, desc:"四阶段·回廊意志" },
+  guard:    { name:"回廊守卫",   hp:185, atk:11, def:27, poise:58,  desc:"标准重甲" },
+  berserker:{ name:"血狂战士",   hp:160, atk:14, def:10, poise:42,  desc:"低血嗜血双动" },
+  sorcerer: { name:"咒术师",     hp:170, atk:13, def:15, poise:68,  shield:.22, desc:"护盾+蓄力" },
+  butcher:  { name:"碎铠屠夫",   hp:215, atk:15, def:22, poise:74,  debuffOnHit:true, desc:"攻击附带碎甲" },
+  lord:     { name:"回廊之主",   hp:285, atk:14, def:27, poise:100, desc:"三阶段王权" },
+  bloodfang:{ name:"血牙领主",   hp:230, atk:16, def:18, poise:62,  lifesteal:.4, desc:"攻击吸血 40%" },
+  voidmage: { name:"虚空咒师",   hp:240, atk:15, def:18, poise:74,  shield:.25, blink:.25, desc:"闪现规避+双蓄力" },
+  golem:    { name:"磐岩傀儡",   hp:265, atk:13, def:44, poise:158, thorns:.22, desc:"反伤甲+极高韧性" },
+  shadow:   { name:"影刃刺客",   hp:195, atk:17, def:15, poise:52,  blink:.2, swift:true, desc:"迅捷追击+闪避" },
+  heart:    { name:"回廊之心",   hp:380, atk:16, def:30, poise:126, lifesteal:.25, desc:"四阶段·回廊意志" },
 };
 const ENDLESS_POOL = ["guard","berserker","sorcerer","butcher","bloodfang","voidmage","golem","shadow","lord"];
 const AFFIXES = [
@@ -267,8 +267,8 @@ const cv = document.getElementById("cv"); let cx = cv.getContext("2d");
 const W = cv.width, H = cv.height;
 const P_BASE = { x:225, y:318 }, E_BASE = { x:735, y:318 };
 const V = {
-  p:{ ox:0, oy:0, flash:0, ghost:0, block:0, visible:1, kb:0 },
-  e:{ ox:0, flash:0, visible:1, aura:0, charge:0, kb:0, telegraph:0 },
+  p:{ ox:0, oy:0, flash:0, ghost:0, block:0, visible:1, kb:0, z:0, zs:1, rot:0, sq:1 },
+  e:{ ox:0, flash:0, visible:1, aura:0, charge:0, kb:0, telegraph:0, z:0, zs:1, rot:0, sq:1 },
   slash:{ show:0, x:0, y:0, flip:1, cross:0, angle:0, rad:46 },
   ring:{ show:0, x:0, y:0, r:0 },
   proj:{ show:0, x:0, y:0, r:6 },
@@ -323,6 +323,16 @@ function drawBG(){
 /* ---- 角色：共享分层图元 + 每层独立造型 ---- */
 const OUT = "#14101f";
 function shadow(x,y,w){ cx.fillStyle="rgba(0,0,0,.5)"; cx.beginPath(); cx.ellipse(x,y+4,w,7,0,0,7); cx.fill(); }
+/* 伪3D：离地越高，影子越小越淡 */
+function depthShadow(x,y,w,z){
+  const k = 1 - Math.min(.55,(z||0)/260);
+  cx.fillStyle=`rgba(0,0,0,${.5*k})`;
+  cx.beginPath(); cx.ellipse(x,y+4,w*k,7*k,0,0,7); cx.fill();
+}
+/* 动作序列之间把伪3D姿态归零 */
+function resetDepth(who){
+  (who==="p"?[V.p]:who==="e"?[V.e]:[V.p,V.e]).forEach(o=>{ o.z=0; o.zs=1; o.rot=0; o.sq=1; });
+}
 const fc = (c,f) => f>0.05 ? "#f4f4ff" : c;
 function vgrad(y0,y1,c0,c1){ const g=cx.createLinearGradient(0,y0,0,y1); g.addColorStop(0,c0); g.addColorStop(1,c1); return g; }
 function poly(pts, fill){
@@ -381,14 +391,17 @@ function drawPlayer(x,y){
   if ((V.p.visible==null?1:V.p.visible) <= 0.02) return;
   cx.save(); cx.globalAlpha = V.p.visible==null?1:V.p.visible;
   const bob = Math.sin(V.t/480)*2.5;
-  y += bob - V.p.oy;
+  y = y + bob - V.p.oy;
   if (V.p.ghost > 0.02){ cx.globalAlpha = (V.p.visible==null?1:V.p.visible)*V.p.ghost*0.45; drawPlayerBody(x - V.p.ghost*70, y); cx.globalAlpha = V.p.visible==null?1:V.p.visible; }
-  drawPlayerBody(x,y);
+  // 伪3D：绕脚底抬升(z)、镜头推近(zs)、纵向挤压(sq)、倾身(rot)
+  const st = V.p, z = st.z||0, zs = st.zs==null?1:st.zs, sq = st.sq==null?1:st.sq, fy = y-z;
+  cx.translate(x, fy); cx.scale(zs, zs*sq); cx.rotate(st.rot||0); cx.translate(-x, -fy);
+  drawPlayerBody(x, fy);
   if (V.p.block > 0.02){
     cx.strokeStyle = `rgba(127,216,160,${V.p.block})`; cx.lineWidth = 4;
-    cx.beginPath(); cx.arc(x+16, y-58, 34, -1.1, 1.1); cx.stroke();
+    cx.beginPath(); cx.arc(x+16, fy-58, 34, -1.1, 1.1); cx.stroke();
     cx.strokeStyle = `rgba(190,255,215,${V.p.block*0.55})`; cx.lineWidth = 1.5;
-    cx.beginPath(); cx.arc(x+16, y-58, 39, -1.1, 1.1); cx.stroke();
+    cx.beginPath(); cx.arc(x+16, fy-58, 39, -1.1, 1.1); cx.stroke();
   }
   cx.restore();
 }
@@ -451,14 +464,15 @@ const ENEMY_DRAW = {
 function drawEnemy(x,y){
   if ((V.e.visible==null?1:V.e.visible) <= 0.02) return;
   cx.save(); cx.globalAlpha = V.e.visible==null?1:V.e.visible;
+  const st0 = V.e, z = st0.z||0, zs = st0.zs==null?1:st0.zs, sq = st0.sq==null?1:st0.sq;
+  y += Math.sin(V.t/420 + 2)*2.5 - z;
   if (V.e.aura > 0.02){
     const ag = cx.createRadialGradient(x,y-70,10,x,y-70,115);
     ag.addColorStop(0,`rgba(255,70,70,${0.35*V.e.aura})`); ag.addColorStop(1,"rgba(255,70,70,0)");
     cx.fillStyle = ag; cx.beginPath(); cx.arc(x,y-70,115,0,7); cx.fill();
   }
   const sc = ENEMY_SCALE[E.type] || 1.05;
-  cx.translate(x,y); cx.scale(sc,sc); cx.translate(-x,-y);
-  y += Math.sin(V.t/420 + 2)*2.5;
+  cx.translate(x,y); cx.scale(sc*zs, sc*zs*sq); cx.rotate(st0.rot||0); cx.translate(-x,-y);
   (ENEMY_DRAW[E.type] || dGuard)(x, y, V.e.flash);
   if (V.e.charge > 0.03){
     const oy = y-124, r = 6+V.e.charge*17;
@@ -1055,6 +1069,10 @@ function loop(ts){
   // 击退衰减
   V.p.kb *= Math.pow(0.85, dt/16); V.e.kb *= Math.pow(0.85, dt/16);
   if (Math.abs(V.p.kb)<0.5) V.p.kb=0; if (Math.abs(V.e.kb)<0.5) V.e.kb=0;
+  // 受击挤压/缩放回归（动作序列运行时每帧覆盖，不冲突）
+  const sqK = 1 - Math.pow(0.86, dt/16);
+  V.e.sq += (1-V.e.sq)*sqK; V.e.zs += (1-V.e.zs)*sqK;
+  V.p.sq += (1-V.p.sq)*sqK; V.p.zs += (1-V.p.zs)*sqK;
   // 连击计数器
   V.comboTimer = Math.max(0, V.comboTimer - dt);
   if (V.comboTimer <= 0) V.comboCount = 0;
@@ -1066,8 +1084,11 @@ function loop(ts){
   drawBG();
   if (S && E){
     const px = P_BASE.x + V.p.ox + (V.p.kb||0), ex = E_BASE.x + V.e.ox + (V.e.kb||0);
-    shadow(px, P_BASE.y, 26); shadow(ex, E_BASE.y, 30);
+    depthShadow(px, P_BASE.y, 26, V.p.z); depthShadow(ex, E_BASE.y, 30, V.e.z);
     if (V.proj.show > 0){
+      // 飞行体地面投影（伪3D）
+      cx.fillStyle="rgba(140,80,255,.22)"; cx.beginPath();
+      cx.ellipse(V.proj.x, P_BASE.y+4, 11, 4, 0, 0, 7); cx.fill();
       const pg = cx.createRadialGradient(V.proj.x,V.proj.y,1,V.proj.x,V.proj.y,V.proj.r+6);
       pg.addColorStop(0,"rgba(220,150,255,.95)"); pg.addColorStop(1,"rgba(140,80,255,0)");
       cx.fillStyle = pg; cx.beginPath(); cx.arc(V.proj.x,V.proj.y,V.proj.r+6,0,7); cx.fill();
@@ -1186,8 +1207,8 @@ function startFloor(){
         p:{ hp:playerMaxHp(), st:playerMaxSt(), guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0} },
         stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
   Dp.hp = S.p.hp; Dp.st = S.p.st; De.hp = E.hp; De.poise = E.poise; De.shd = E.shield;
-  V.p = { ox:0, oy:0, flash:0, ghost:0, block:0, visible:1, kb:0 };
-  V.e = { ox:0, flash:0, visible:1, aura:0, charge:0, kb:0, telegraph:0 };
+  V.p = { ox:0, oy:0, flash:0, ghost:0, block:0, visible:1, kb:0, z:0, zs:1, rot:0, sq:1 };
+  V.e = { ox:0, flash:0, visible:1, aura:0, charge:0, kb:0, telegraph:0, z:0, zs:1, rot:0, sq:1 };
   V.dim = 0; V.fullflash = 0; V.slash.show = 0; V.hitstop = 0;
   particles = []; floaters = []; afterimages = []; slashTrail = [];
   document.getElementById("log").innerHTML = "";
@@ -1199,11 +1220,11 @@ function startFloor(){
 function spawnEnemy(key){
   const t = ENEMIES[key], f = meta.floor;
   let sHp, sAtk;
-  if (f <= 10){ sHp = 1 + .105*(f-1); sAtk = 1 + .07*(f-1); }
-  else { sHp = 1.63 + .10*(f-10); sAtk = 1.45 + .06*(f-10); }
+  if (f <= 10){ sHp = 1 + .108*(f-1); sAtk = 1 + .078*(f-1); }
+  else { sHp = 1.96 + .105*(f-10); sAtk = 1.7 + .065*(f-10); }
   E = { type:key, name:t.name, desc:t.desc,
     maxhp:Math.round(t.hp*sHp), atk:+(t.atk*sAtk).toFixed(1), def:t.def,
-    maxpoise:Math.round(t.poise*(1+.05*(Math.min(f,10)-1))),
+    maxpoise:Math.round(t.poise*(1+.06*(Math.min(f,10)-1))),
     phase:1, stunned:0, shield:0, maxshield:t.shield?Math.round(t.hp*sHp*t.shield):0,
     chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0}, intent:null, guarding:false,
     lifesteal:t.lifesteal||0, blink:t.blink||0, thorns:t.thorns||0, swift:!!t.swift, debuffOnHit:!!t.debuffOnHit,
@@ -1306,6 +1327,7 @@ function playerAct(kind){
   if (kind === "riposte" && E.poise > 0) return;
   if (kind === "potion" && meta.potions <= 0) return;
   lockUI();
+  resetDepth("p");
   S.turn++; S.frame += 2;
   p.st = Math.min(playerMaxSt(), p.st + (hasRelic("will")?16:10));
   p.guard = false;
@@ -1314,7 +1336,7 @@ function playerAct(kind){
   if (kind === "guard"){
     p.guard = true; p.st = Math.min(playerMaxSt(), p.st+15);
     addLog(`${h}玩家 <b>格挡</b>，体力 <span class="heal">+15</span>，减伤 70%${hasRelic("thorn")?" · 荆棘待发":""}`);
-    runSeq([{ dur:260, update:t=>{ V.p.block = t; }, end:()=>{ V.p.block = 0.9; } }], () => enemyPhase());
+    runSeq([{ dur:260, update:t=>{ V.p.block = t; V.p.sq = 1-0.09*Math.sin(t*Math.PI); V.p.z = 5*Math.sin(t*Math.PI); }, end:()=>{ V.p.block = 0.9; V.p.sq=1; V.p.z=0; } }], () => enemyPhase());
     return;
   }
   if (kind === "dodge"){
@@ -1322,8 +1344,8 @@ function playerAct(kind){
     p.st -= 20; p.dodgeBuff = true;
     addLog(`${h}玩家 <b>闪避</b>，规避本回合伤害，下次轻击必暴击`);
     runSeq([
-      { dur:200, update:t=>{ V.p.ghost = t; V.p.ox = -46*t; } },
-      { dur:260, update:t=>{ V.p.ghost = 1-t; V.p.ox = -46*(1-t); } },
+      { dur:200, update:t=>{ V.p.ghost = t; V.p.ox = -46*t; V.p.rot = -0.18*t; V.p.sq = 1-0.12*t; V.p.zs = 1-0.06*t; } },
+      { dur:260, update:t=>{ V.p.ghost = 1-t; V.p.ox = -46*(1-t); V.p.rot = -0.18*(1-t); V.p.sq = 1-0.12*(1-t); V.p.zs = 1-0.06*(1-t); } },
     ], () => enemyPhase());
     return;
   }
@@ -1340,18 +1362,20 @@ function playerAct(kind){
   if (kind === "riposte"){
     const mult = hasRelic("hunter")?4.0:3.0;
     const d = Math.round(playerAtk()*mult*1.5);
+    const L = E_BASE.x-P_BASE.x-70;
     runSeq([
-      { dur:300, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-70)*t; V.dim = t; } },
-      { dur:160, start:()=>{
+      { dur:300, update:t=>{ V.p.ox = L*t; V.dim = t; V.p.rot = 0.18*Math.sin(t*Math.PI*0.8); V.p.z = 14*Math.sin(t*Math.PI*0.7); V.p.zs = 1+0.08*t; if (Math.random()<.5) afterimages.push({who:'p',ox:V.p.ox,life:1}); } },
+      { dur:170, start:()=>{
           S.frame += 4; S.stats.execs++;
           E.hp = Math.max(0, E.hp - d); S.stats.dmg += d;
           floatText(E_BASE.x-10, E_BASE.y-160, `${d}!`, "#c792ea", 34, { big:true });
           floatText(E_BASE.x-10, E_BASE.y-195, "处决", "#e8d5ff", 15, { big:true });
           burst(E_BASE.x-20, E_BASE.y-70, 30, "#c792ea", 3.4, 1.2);
           burst(E_BASE.x-20, E_BASE.y-70, 14, "#ffd76e", 2.4, 1.6);
-          V.shake = 15; V.slash = { show:1, x:E_BASE.x-30, y:E_BASE.y-70, flip:1, cross:1 };
-        }, update:t=>{ V.slash.show = 1-t; V.slash.cross = 1-t; } },
-      { dur:340, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-70)*(1-t); V.dim = 1-t; V.slash.show = 0; V.slash.cross = 0; } },
+          V.shake = 16; V.slash = { show:1, x:E_BASE.x-30, y:E_BASE.y-70, flip:1, cross:1 };
+          V.p.zs = 1.2; V.p.rot = -0.3; V.p.z = 10;
+        }, update:t=>{ V.slash.show = 1-t; V.slash.cross = 1-t; V.p.zs = 1.2-0.12*t; V.p.rot = -0.3+0.3*t; V.p.z = 10*(1-t); } },
+      { dur:360, update:t=>{ V.p.ox = L*(1-t); V.dim = 1-t; V.p.zs = 1.08-0.08*t; V.p.rot = 0; V.slash.show = 0; V.slash.cross = 0; } },
     ], () => afterPlayerAttack(true));
     return;
   }
@@ -1359,19 +1383,40 @@ function playerAct(kind){
     if (meta.combo < 3){ sysLog("连击不足（需 3 层）"); S.turn--; renderUI(); return; }
     meta.combo = 0;
     const d = Math.round(playerAtk()*4.0*1.5);
+    const L = E_BASE.x-P_BASE.x-60, hit = {};
     runSeq([
-      { dur:400, start:()=>{ V.fullflash = .5; }, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-60)*t; V.shake = 6; } },
-      { dur:200, start:()=>{
-          S.stats.dmg += d; E.hp = Math.max(0, E.hp-d);
-          floatText(E_BASE.x-10, E_BASE.y-165, `${d}!!`, "#ffd76e", 38, { big:true });
-          floatText(E_BASE.x-10, E_BASE.y-205, "终 结 技", "#fff2cc", 16, { big:true });
-          burst(E_BASE.x-20, E_BASE.y-70, 42, "#ffd76e", 4, 2);
-          ringFx(E_BASE.x-20, E_BASE.y-70, "rgba(255,215,110,.9)");
-          ringFx(E_BASE.x-20, E_BASE.y-70, "rgba(255,255,255,.7)");
-          V.shake = 18;
-          addLog(`<span class="crit">终结技</span> → ${d} 伤害（4× 必暴击）`);
+      // 蓄力蹲身
+      { dur:240, start:()=>{ V.fullflash = .35; }, update:t=>{
+          V.p.ox = -14*t; V.p.sq = 1-0.28*t; V.p.zs = 1+0.07*t; V.p.rot = 0.12*t; V.p.z = 0;
+          if (Math.random()<.3) afterimages.push({who:'p',ox:V.p.ox,life:1});
         } },
-      { dur:300, update:t=>{ V.p.ox = (E_BASE.x-P_BASE.x-60)*(1-t); } },
+      // 起跳（举剑跃至最高点）
+      { dur:300, update:t=>{
+          V.p.ox = -14*(1-t) + L*0.72*t;
+          V.p.z = 108*Math.sin(t*Math.PI/2);
+          V.p.zs = 1.07 - 0.11*t; V.p.rot = 0.12 - 0.42*t; V.p.sq = 1;
+          if (Math.random()<.4) afterimages.push({who:'p',ox:V.p.ox,life:1});
+        } },
+      // 下劈（落地瞬间结算）
+      { dur:180, update:t=>{
+          V.p.ox = L*0.72 + L*0.28*t;
+          V.p.z = 108*Math.cos(t*Math.PI/2);
+          V.p.zs = 0.96 + 0.24*t; V.p.rot = -0.3 - 0.12*t;
+          if (t >= .88 && !hit.done){ hit.done = true;
+            S.stats.dmg += d; E.hp = Math.max(0, E.hp-d);
+            floatText(E_BASE.x-10, E_BASE.y-165, `${d}!!`, "#ffd76e", 38, { big:true });
+            floatText(E_BASE.x-10, E_BASE.y-205, "终 结 技", "#fff2cc", 16, { big:true });
+            burst(E_BASE.x-20, E_BASE.y-70, 42, "#ffd76e", 4, 2);
+            burst(P_BASE.x+L, P_BASE.y-6, 22, "#c9a86a", 3, 0.4);
+            ringFx(E_BASE.x-20, E_BASE.y-70, "rgba(255,215,110,.9)");
+            ringFx(E_BASE.x-20, E_BASE.y-70, "rgba(255,255,255,.7)");
+            ringFx(P_BASE.x+L, P_BASE.y-8, "rgba(255,215,110,.6)");
+            V.shake = 20; V.fullflash = .5; V.p.sq = .58;
+            addLog(`<span class="crit">终结技</span> → ${d} 伤害（4× 必暴击）`);
+          }
+        } },
+      // 落地恢复
+      { dur:300, update:t=>{ V.p.ox = L*(1-t); V.p.sq = .58+0.42*t; V.p.zs = 1.2-0.2*t; V.p.rot = -0.42+0.42*t; } },
     ], () => afterPlayerAttack(true));
     return;
   }
@@ -1402,46 +1447,60 @@ function playerAct(kind){
     addLog(`${h}玩家 <b>${mv.name}</b> → <span class="sys">${E.name} 闪现规避！</span>`);
     runSeq([
       { dur:140, update:t=>{ V.p.ox = 60*t; } },
-      { dur:200, start:()=>{ burst(E_BASE.x, E_BASE.y-70, 14, "#6a9cff", 2, 0.5); floatText(E_BASE.x-10, E_BASE.y-150, "MISS", "#8a93ad", 20); V.e.ghost = 1; },
-        update:t=>{ V.e.ox = -70*Math.sin(t*Math.PI); } },
+      { dur:220, start:()=>{ burst(E_BASE.x, E_BASE.y-70, 14, "#6a9cff", 2, 0.5); floatText(E_BASE.x-10, E_BASE.y-150, "MISS", "#8a93ad", 20); V.e.z = 58; V.e.zs = 1.12; V.e.sq = .75; },
+        update:t=>{ V.e.ox = -70*Math.sin(t*Math.PI); V.e.z = 58*Math.cos(t*Math.PI/2); V.e.zs = 1.12-0.12*t; V.e.sq = .75+0.25*t; } },
       { dur:140, update:t=>{ V.p.ox = 60*(1-t); } },
     ], () => afterPlayerAttack(false));
     return;
   }
   const elemTxt = mv.elem && WEAKNESS[E.type] === mv.elem ? ` <span style="color:${ELEMENTS[mv.elem].color}">⚡弱点克制！</span>` : "";
   if (kind === "light"){
-    // 双段斩
+    // 双段斩（前冲倾身 + 第二段小跳反手）
     runSeq([
-      { dur:160, update:t=>{ V.p.ox = 92*t*t; if (Math.random()<.5) afterimages.push({who:'p',ox:V.p.ox,life:1}); } },
+      { dur:160, update:t=>{ V.p.ox = 92*t*t; V.p.rot = 0.14*t; V.p.zs = 1+0.05*t; V.p.z = 6*Math.sin(t*Math.PI); if (Math.random()<.5) afterimages.push({who:'p',ox:V.p.ox,life:1}); } },
       { dur:130, start:()=>{
           S.frame += 1;
           hitEnemy(d, crit, mv, shTxt, elemTxt, 1);
           V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-70, flip:1, cross:0 };
           V.e.flash = 1; V.shake = 5;
-        }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); } },
-      { dur:120, start:()=>{
+        }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); V.p.rot = 0.14-0.18*t; V.p.zs = 1.05-0.02*t; } },
+      { dur:130, start:()=>{
           const d2 = Math.max(1, Math.round(d*0.35));
           E.hp = Math.max(0, E.hp - d2); S.stats.dmg += d2;
           floatText(E_BASE.x+V.e.ox-8, E_BASE.y-130, `${d2}`, "#ffb0a0", 16);
           burst(E_BASE.x+V.e.ox-26, E_BASE.y-64, 6, "#ff7a4a", 1.6, 0.6);
           V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-84, flip:-1, cross:0 };
-        }, update:t=>{ V.slash.show = 1-t; } },
-      { dur:150, update:t=>{ V.p.ox = 92*(1-t); } },
+        }, update:t=>{ V.slash.show = 1-t; V.p.rot = -0.04+0.18*t; V.p.z = 12*Math.sin(t*Math.PI); V.p.zs = 1.03+0.05*t; } },
+      { dur:150, update:t=>{ V.p.ox = 92*(1-t); V.p.rot = 0.14*(1-t); V.p.zs = 1.08-0.08*t; V.p.z = 0; } },
     ], () => afterPlayerAttack(false));
   } else {
-    // 跳劈
-    const reach = 120;
+    // 重击·雷陨跳劈：后撤蓄力 → 跃起 → 落地劈（镜头冲击+落地尘环）
+    const reach = 150;
     runSeq([
-      { dur:260, update:t=>{ V.p.ox = reach*0.4*t; V.p.oy = 70*Math.sin(t*Math.PI*0.5); if (Math.random()<.4) afterimages.push({who:'p',ox:V.p.ox,life:1}); } },
-      { dur:150, start:()=>{
+      { dur:180, update:t=>{ V.p.ox = -12*t; V.p.sq = 1-0.22*t; V.p.zs = 1-0.04*t; V.p.rot = 0.12*t; } },
+      { dur:300, update:t=>{
+          V.p.ox = -12*(1-t) + reach*0.55*t;
+          V.p.z = 92*Math.sin(t*Math.PI/2);
+          V.p.zs = 0.96+0.1*t; V.p.rot = 0.12-0.4*t; V.p.sq = 1;
+          if (Math.random()<.4) afterimages.push({who:'p',ox:V.p.ox,life:1});
+        } },
+      { dur:150, update:t=>{
+          V.p.ox = reach*0.55 + reach*0.3*t;
+          V.p.z = 92*Math.cos(t*Math.PI/2);
+          V.p.zs = 1.06+0.12*t; V.p.rot = -0.28-0.1*t;
+        } },
+      { dur:170, start:()=>{
           S.frame += mv.recovery;
           hitEnemy(d, crit, mv, shTxt, elemTxt, 1);
           V.slash = { show:1, x:E_BASE.x+V.e.ox-34, y:E_BASE.y-70, flip:1, cross:0 };
-          V.e.flash = 1; V.shake = 10;
-          ringFx(E_BASE.x+V.e.ox-30, E_BASE.y-10, "rgba(255,215,110,.8)");
-          burst(E_BASE.x+V.e.ox-30, E_BASE.y-70, crit?18:12, crit?"#ffd76e":"#ffd76e", 2.4, 0.8);
-        }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); V.p.oy = 70*(1-t*0.5); } },
-      { dur:200, update:t=>{ V.p.ox = reach*0.4*(1-t); V.p.oy = 35*(1-t); } },
+          V.e.flash = 1; V.shake = 14;
+          ringFx(E_BASE.x+V.e.ox-30, E_BASE.y-10, "rgba(255,215,110,.9)");
+          ringFx(P_BASE.x+reach*0.85, P_BASE.y-8, "rgba(255,215,110,.55)");
+          burst(P_BASE.x+reach*0.85, P_BASE.y-4, 20, "#c9a86a", 2.6, 0.3);
+          burst(E_BASE.x+V.e.ox-30, E_BASE.y-70, crit?18:12, "#ffd76e", 2.4, 0.8);
+          V.p.sq = .6; V.p.zs = 1.18;
+        }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); V.p.sq = .6+0.25*t; V.p.zs = 1.18-0.1*t; } },
+      { dur:220, update:t=>{ V.p.ox = reach*0.85*(1-t); V.p.sq = .85+0.15*t; V.p.zs = 1.08-0.08*t; V.p.rot = -0.38+0.38*t; } },
     ], () => afterPlayerAttack(false));
   }
 }
@@ -1450,8 +1509,9 @@ function hitEnemy(d, crit, mv, shTxt, elemTxt, poiseMul){
   // 命中停顿：重击/暴击更长
   V.hitstop = crit ? 110 : (mv.name === "重击" ? 90 : 55);
   V.comboCount++; V.comboTimer = 1400;
-  // 击退（朝向敌人方向）
+  // 击退（朝向敌人方向）+ 受击挤压
   V.e.kb = -26 - (crit?16:0);
+  V.e.sq = crit ? .78 : .85; V.e.zs = 1.06;
   // 剑痕拖尾
   const flip = mv.name === "轻击" ? 1 : 1;
   const col = ELEMENTS[mv.elem].color;
@@ -1490,8 +1550,100 @@ function afterPlayerAttack(){
   enemyPhase();
 }
 /* ---- 敌人回合：执行预告的 intent ---- */
+/* 招式风格：lunge 突刺 / slam 跳劈 / sweep 横扫 / dash 瞬冲 / cast 浮空施法 */
+function atkStyle(type, it){
+  if (it.ranged) return "cast";
+  const n = it.name || "";
+  if (it.heavy) return "slam";
+  if (n.includes("跳劈") || n.includes("裂地") || n.includes("崩山") || n.includes("崩岩") || n.includes("震怒") || n.includes("重劈") || n.includes("岩拳")) return "slam";
+  if (n.includes("横扫") || n.includes("王权")) return "sweep";
+  if (n.includes("三连")) return "dash";
+  if (n.includes("追击") || n.includes("背刺") || n.includes("影袭") || n.includes("突刺") || n.includes("嗜血")) return "dash";
+  return "lunge";
+}
+const SLAM_HOP = { guard:30, berserker:74, butcher:42, lord:58, bloodfang:52, golem:46, heart:48, shadow:26, sorcerer:30, voidmage:30 };
+/* 敌人攻击事件：把意图事件转成带伪3D姿态的动画 */
+function buildAtkEvent(e){
+  const D = E_BASE.x - P_BASE.x - 80; // 冲刺距离（ox 负方向）
+  const strike = ()=>{ if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, !!e.ranged, e.drain, !!e.flurry); } };
+  const rest = ()=>{ V.e.ox=0; V.e.z=0; V.e.zs=1; V.e.rot=0; V.e.sq=1; };
+  if (e.style === "cast"){
+    return { dur:880, start:()=>{ V.e.telegraph = 1; },
+      update:t=>{
+        if (t < .36){
+          const u=t/.36;
+          V.e.ox=-30*u; V.e.z=26*Math.sin(u*Math.PI/2); V.e.zs=1+.04*u; V.e.sq=1;
+          V.e.charge=.6*u; V.e.telegraph=.6+.4*Math.sin(t*Math.PI*6);
+        } else {
+          if (!e._fired){ e._fired = true; V.proj={ show:1, x:E_BASE.x+V.e.ox, y:E_BASE.y-116, r:10 }; }
+          const u=Math.min(1,(t-.36)/.5);
+          V.proj.x = E_BASE.x+V.e.ox + (P_BASE.x-(E_BASE.x+V.e.ox))*u;
+          V.proj.y = (E_BASE.y-116) + Math.sin(u*Math.PI)*38;
+          V.e.telegraph=.5*(1-u);
+          if (u >= 1){ V.proj.show=0; strike(); }
+        }
+        if (t > .9){ const u=(t-.9)/.1; V.e.ox=-30*(1-u); V.e.z=26*(1-u); V.e.zs=1.04-.04*u; V.e.charge=0; }
+      },
+      end:()=>{ V.proj.show=0; V.e.telegraph=0; V.e.charge=0; rest(); } };
+  }
+  if (e.style === "slam"){
+    const hop = SLAM_HOP[E.type] || 40;
+    return { dur:820,
+      start:()=>{ V.e.telegraph = 1; },
+      update:t=>{
+        if (t < .14){ const u=t/.14; V.e.ox=10*u; V.e.sq=1-.22*u; V.e.zs=1+.05*u; V.e.rot=.1*u; V.e.z=0;
+          V.e.telegraph=.5+.5*Math.sin(t*Math.PI*8); }
+        else if (t < .52){ const u=(t-.14)/.38;
+          V.e.ox=10*(1-u)-D*.7*u; V.e.z=hop*Math.sin(u*Math.PI/2); V.e.zs=1.05-.08*u; V.e.rot=.1-.25*u; V.e.sq=1;
+          V.e.telegraph=.4+.4*Math.sin(t*Math.PI*8); }
+        else if (t < .62){ const u=(t-.52)/.1;
+          V.e.ox=-D*.7-D*.3*u; V.e.z=hop*Math.cos(u*Math.PI/2); V.e.zs=.97+.16*u; V.e.rot=-.15-.12*u; }
+        else {
+          if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, false, e.drain);
+            V.shake = 16; V.e.sq = .55; V.e.zs = 1.13; V.e.telegraph = 0;
+            ringFx(P_BASE.x+60, P_BASE.y-8, "rgba(255,120,90,.85)");
+            burst(P_BASE.x+60, P_BASE.y-4, 18, "#d8a878", 2.8, 0.3);
+          }
+          if (t < .8){ V.e.ox=-D; V.e.rot=-.27; }
+          else { const u=(t-.8)/.2; V.e.ox=-D*(1-u); V.e.rot=-.27*(1-u); V.e.sq=.55+.45*u; V.e.zs=1.13-.13*u; }
+        }
+      }, end:()=>{ V.e.telegraph=0; rest(); } };
+  }
+  if (e.style === "sweep"){
+    return { dur:560, update:t=>{
+        if (t < .34){ const u=t/.34; V.e.ox=10*u; V.e.rot=.22*u; V.e.sq=1-.05*u; }
+        else if (t < .58){ const u=(t-.34)/.24;
+          V.e.ox=10*(1-u)-D*u; V.e.rot=.22-.5*u; V.e.zs=1+.1*u; V.e.z=6*Math.sin(u*Math.PI); V.e.sq=1; }
+        else { strike();
+          if (t < .72){ V.e.ox=-D; V.e.rot=-.28; V.e.zs=1.1; }
+          else { const u=(t-.72)/.28; V.e.ox=-D*(1-u); V.e.rot=-.28*(1-u); V.e.zs=1.1-.1*u; } }
+      }, end:rest };
+  }
+  if (e.style === "dash"){
+    return { dur:420, update:t=>{
+        if (t < .12){ const u=t/.12; V.e.ox=10*u; V.e.rot=.1*u; V.e.sq=1-.1*u; }
+        else if (t < .46){ const u=(t-.12)/.34;
+          V.e.ox=10*(1-u)-D*u; V.e.rot=.1-.34*u; V.e.zs=1+.16*u; V.e.z=8*Math.sin(u*Math.PI); V.e.sq=1; }
+        else {
+          if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, false, e.drain);
+            burst(P_BASE.x+80, P_BASE.y-6, 10, "#e8d5ff", 2.4, 0.5); }
+          if (t < .6){ V.e.ox=-D; V.e.rot=-.24; V.e.zs=1.16; }
+          else { const u=(t-.6)/.4; V.e.ox=-D*(1-u); V.e.rot=-.24*(1-u); V.e.zs=1.16-.16*u; V.e.z=0; } }
+      }, end:rest };
+  }
+  // lunge（默认突刺）
+  return { dur:520, update:t=>{
+      if (t < .18){ const u=t/.18; V.e.ox=16*u; V.e.rot=.14*u; V.e.sq=1-.08*u; }
+      else if (t < .58){ const u=(t-.18)/.4;
+        V.e.ox=16*(1-u)-D*u; V.e.rot=.14-.3*u; V.e.zs=1+.12*u; V.e.z=10*Math.sin(u*Math.PI); V.e.sq=1; }
+      else { strike();
+        if (t < .74){ V.e.ox=-D; V.e.rot=-.16; V.e.zs=1.12; }
+        else { const u=(t-.74)/.26; V.e.ox=-D*(1-u); V.e.rot=-.16*(1-u); V.e.zs=1.12-.12*u; V.e.z=0; } }
+    }, end:rest };
+}
 function enemyPhase(){
   if (S.over) return;
+  resetDepth();
   const evs = [];
   if (E.stunned > 0){
     E.stunned--; sysLog("敌人倒地中，跳过行动");
@@ -1529,15 +1681,27 @@ function enemyPhase(){
   else if (it.type === "debuff"){
     evs.push({ debuff:it.name });
   }
-  else { // atk / drain
-    evs.push({ atk:true, mult:it.mult, name:it.name, ranged:!!it.ranged, heavy:!!it.heavy, follow:it.follow, follow2:it.follow2, drain:it.type==="drain" });
+  else { // atk / drain（多段攻击拆成多事件，总伤害与原倍率基本持平）
+    const n = it.name || "";
+    const drain = it.type === "drain";
+    if (n.includes("双连击")){
+      evs.push({ atk:true, mult:.5, name:n+"·一段", style:"sweep", drain, flurry:true });
+      evs.push({ atk:true, mult:.4, name:n+"·二段", style:"dash", drain, flurry:true });
+    } else if (n.includes("三连")){
+      ["①","②","③"].forEach(m=>evs.push({ atk:true, mult:.24, name:n+m, style:"dash", drain, flurry:true }));
+    } else {
+      evs.push({ atk:true, mult:it.mult, name:n, style:atkStyle(E.type, it), ranged:!!it.ranged, drain });
+      if (it.follow){
+        evs.push({ atk:true, mult:+(it.mult*it.follow*0.45).toFixed(2), name:n+"·追击", style:"dash", drain, flurry:true });
+      }
+    }
   }
   if (E.type === "berserker" && E.phase === 2 && it.type === "atk")
-    evs.push({ atk:true, mult:.8, name:"嗜血追击" });
+    evs.push({ atk:true, mult:.8, name:"嗜血追击", style:"dash" });
   if (E.swift && it.type === "atk" && Math.random() < .35)
-    evs.push({ atk:true, mult:.7, name:"迅捷追击" });
+    evs.push({ atk:true, mult:.7, name:"迅捷追击", style:"dash" });
   if (E.affix === "swift" && it.type === "atk" && Math.random() < .35)
-    evs.push({ atk:true, mult:.7, name:"迅捷追击" });
+    evs.push({ atk:true, mult:.7, name:"迅捷追击", style:"dash" });
   if (E.affix === "regen") evs.push({ regen:.03 });
 
   runSeq(evs.map(e => {
@@ -1546,7 +1710,7 @@ function enemyPhase(){
         burst(E_BASE.x, E_BASE.y-80, 24, "#ff6a6a", 2.8, 1.5);
         floatText(E_BASE.x, E_BASE.y-170, "PHASE UP", "#ff9c9c", 24, { big:true });
       }, update:t=>{ V.e.aura = 0.6+0.4*Math.sin(t*Math.PI); } };
-    if (e.charge) return { dur:520, start:()=>{ addLog(`${tag()}<b>${E.name}</b> ${e.msg}`); V.e.charge = 0.1; V.e.telegraph = 1; }, update:t=>{ V.e.charge = 0.1+0.9*t; V.e.telegraph = 0.6+0.4*Math.sin(t*Math.PI*4); } };
+    if (e.charge) return { dur:520, start:()=>{ addLog(`${tag()}<b>${E.name}</b> ${e.msg}`); V.e.charge = 0.1; V.e.telegraph = 1; }, update:t=>{ V.e.charge = 0.1+0.9*t; V.e.telegraph = 0.6+0.4*Math.sin(t*Math.PI*4); V.e.z = 12*Math.sin(t*Math.PI/2); V.e.zs = 1+0.03*t; }, end:()=>{ V.e.z=0; V.e.zs=1; } };
     if (e.reshield) return { dur:420, start:()=>{
         const add = Math.round(E.maxshield*e.reshield);
         E.shield = Math.min(E.maxshield, E.shield+add);
@@ -1570,24 +1734,11 @@ function enemyPhase(){
         burst(P_BASE.x, P_BASE.y-70, 12, "#c792ea", 2, 1);
         floatText(P_BASE.x, P_BASE.y-140, "易伤!", "#c792ea", 16, { big:true });
       } };
-    if (e.proj) return { dur:640, start:()=>{ V.proj = { show:1, x:E_BASE.x, y:E_BASE.y-90, r:10 }; V.e.telegraph = 0.6; },
-        update:t=>{ V.proj.x = E_BASE.x + (P_BASE.x-E_BASE.x)*t; V.proj.y = E_BASE.y-90 + Math.sin(t*Math.PI)*30; V.e.telegraph = 0.6*(1-t); },
-        end:()=>{ V.proj.show = 0; V.e.charge = 0; enemyHit(e.mult, e.name, true, e.drain); } };
-    return { dur:e.heavy?640:520, start:()=>{ V.e.ox = 0; if (e.heavy){ V.e.telegraph = 1; V.shake = 4; } }, update:t=>{
-        const dist = (E_BASE.x-P_BASE.x-80);
-        if (e.heavy){
-          if (t < .5){ V.e.ox = -dist*Math.sin(t*Math.PI*0.5)*0.4; }
-          else if (t < .62){ if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, false, e.drain); ringFx(P_BASE.x, P_BASE.y-10, "rgba(255,120,90,.8)"); } V.e.ox = -dist*0.4; }
-          else V.e.ox = -dist*0.4*(1-(t-.62)/.38);
-        } else {
-          if (t < .45) V.e.ox = -dist*(t/.45);
-          else if (t < .62){ if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, false, e.drain); } V.e.ox = -dist; }
-          else V.e.ox = -dist*(1-(t-.62)/.38);
-        }
-      } };
+    if (e.atk) return buildAtkEvent(e);
+    return { dur:200, update:()=>{} };
   }), () => endRound());
 }
-function enemyHit(mult, name, ranged, drain){
+function enemyHit(mult, name, ranged, drain, keepDodge){
   if (S.over) return;
   const p = S.p;
   const base = enemyDmg(mult);
@@ -1625,7 +1776,8 @@ function enemyHit(mult, name, ranged, drain){
       note += " · <span class='dmg'>碎甲</span>（易伤+1）";
     }
   }
-  p.dodgeBuff = false;
+  // 多段连段的后续命中不消耗闪避：一次闪避应规避整套连段
+  if (!keepDodge) p.dodgeBuff = false;
   if (final > 0 && meta.combo > 0){ meta.combo = 0; sysLog("连击被打断！"); }
   addLog(`<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> <b>${E.name}</b> <b>${name}</b> → ${final>0?`<span class="dmg">${final}</span> 伤害`:`<span class="heal">0 伤害</span>`} ${note}`);
   flushLog(); renderUI();
@@ -1656,7 +1808,8 @@ function killEnemy(){
         rain(26, "#ffd76e"); rain(14, "#e8d5ff");
         ringFx(E_BASE.x, E_BASE.y-70, "rgba(199,146,234,.9)");
         V.shake = 12; V.fullflash = .3;
-      }, update:t=>{ V.e.visible = 1-t; V.e.aura = 1-t; } },
+      }, update:t=>{ V.e.visible = 1-t; V.e.aura = 1-t;
+        V.e.z = 34*Math.sin(t*Math.PI); V.e.rot = .9*t; V.e.sq = 1-.3*t; V.e.zs = 1-.12*t; } },
   ], () => showVictory(gain));
 }
 function playerDie(){
