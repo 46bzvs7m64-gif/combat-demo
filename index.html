@@ -39,7 +39,8 @@
   .build-line { font-size:11px; color:#bbb; margin-bottom:4px; display:flex; justify-content:space-between; }
   .build-line b { color:#ffd76e; }
   .relic-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
-  .relic-tags span { font-size:9.5px; background:#2b2b4d; border:1px solid #4a4a7a; color:#c7b3ff; border-radius:10px; padding:1px 8px; }
+  .relic-tags span { font-size:9.5px; background:#2b2b4d; border:1px solid #4a4a7a; color:#c7b3ff; border-radius:10px; padding:1px 8px; display:inline-flex; align-items:center; gap:3px; }
+  .relic-tags span svg { width:12px; height:12px; color:#ffd76e; flex:none; }
   .overlay { position:fixed; inset:0; background:rgba(8,8,18,.88); display:none; align-items:center; justify-content:center; z-index:50; }
   .overlay.show { display:flex; }
   .ov-panel { background:#1c1c30; border:1px solid #4a4a7a; border-radius:14px; padding:24px; max-width:640px; width:92%; max-height:88vh; overflow-y:auto; color:#dde; text-align:center; }
@@ -53,12 +54,22 @@
   .ov-panel .sub { font-size:12px; color:#8a8aa0; margin-bottom:14px; line-height:1.7; }
   .choices { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:12px 0; }
   .choice { background:#23233c; border:1px solid #3a3a5c; border-radius:10px; padding:13px 10px; cursor:pointer; transition:all .15s; }
-  .choice:hover { border-color:#c792ea; background:#2b2b52; }
+  .choice:hover { border-color:#c792ea; background:#2b2b52; transform:translateY(-2px); box-shadow:0 6px 18px rgba(150,100,230,.25); }
   .choice .cn { font-size:13px; font-weight:700; color:#c7b3ff; margin-bottom:5px; }
   .choice .cd { font-size:10.5px; color:#9aa; line-height:1.5; }
+  /* 技能图标圆牌 */
+  .ico { width:54px; height:54px; margin:0 auto 9px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 32%, #38325e, #1c1b34 78%); border:1.5px solid #6a56a0;
+    box-shadow:inset 0 0 12px rgba(199,146,234,.28), 0 0 12px rgba(199,146,234,.18); }
+  .ico svg { width:33px; height:33px; display:block; }
+  .ico.gold { color:#ffd76e; border-color:#a07e3a; box-shadow:inset 0 0 12px rgba(255,215,110,.25), 0 0 12px rgba(255,215,110,.15);
+    background:radial-gradient(circle at 50% 32%, #3d3520, #1e1b2e 78%); }
+  .ico.green { color:#8fe8b4; border-color:#3e8a5e; box-shadow:inset 0 0 12px rgba(127,216,160,.22), 0 0 10px rgba(127,216,160,.12);
+    background:radial-gradient(circle at 50% 32%, #1f3a2c, #18222e 78%); width:46px; height:46px; }
+  .ico.green svg { width:28px; height:28px; }
   .upgrid { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; margin:12px 0; }
-  .upbtn { background:#23233c; border:1px solid #3a3a5c; border-radius:10px; padding:11px 8px; cursor:pointer; color:#dde; }
-  .upbtn:hover:not(:disabled) { border-color:#7fd8a0; }
+  .upbtn { background:#23233c; border:1px solid #3a3a5c; border-radius:10px; padding:11px 8px; cursor:pointer; color:#dde; transition:all .15s; }
+  .upbtn:hover:not(:disabled) { border-color:#7fd8a0; transform:translateY(-2px); box-shadow:0 6px 16px rgba(127,216,160,.2); }
   .upbtn:disabled { opacity:.35; cursor:not-allowed; }
   .upbtn .un { font-size:12.5px; font-weight:700; }
   .upbtn .uc { font-size:10.5px; color:#ffd76e; margin-top:3px; }
@@ -191,16 +202,16 @@
 "use strict";
 /* ==================== 敌人总表（含各层独有技能标记） ==================== */
 const ENEMIES = {
-  guard:    { name:"回廊守卫",   hp:185, atk:11, def:27, poise:58,  desc:"标准重甲" },
-  berserker:{ name:"血狂战士",   hp:160, atk:14, def:10, poise:42,  desc:"低血嗜血双动" },
-  sorcerer: { name:"咒术师",     hp:170, atk:13, def:15, poise:68,  shield:.22, desc:"护盾+蓄力" },
-  butcher:  { name:"碎铠屠夫",   hp:215, atk:15, def:22, poise:74,  debuffOnHit:true, desc:"攻击附带碎甲" },
-  lord:     { name:"回廊之主",   hp:285, atk:14, def:27, poise:100, desc:"三阶段王权" },
-  bloodfang:{ name:"血牙领主",   hp:230, atk:16, def:18, poise:62,  lifesteal:.4, desc:"攻击吸血 40%" },
-  voidmage: { name:"虚空咒师",   hp:240, atk:15, def:18, poise:74,  shield:.25, blink:.25, desc:"闪现规避+双蓄力" },
-  golem:    { name:"磐岩傀儡",   hp:265, atk:13, def:44, poise:158, thorns:.22, desc:"反伤甲+极高韧性" },
-  shadow:   { name:"影刃刺客",   hp:195, atk:17, def:15, poise:52,  blink:.2, swift:true, desc:"迅捷追击+闪避" },
-  heart:    { name:"回廊之心",   hp:380, atk:16, def:30, poise:126, lifesteal:.25, desc:"四阶段·回廊意志" },
+  guard:    { name:"回廊守卫",   hp:213, atk:13, def:31, poise:67,  desc:"标准重甲" },
+  berserker:{ name:"血狂战士",   hp:184, atk:16, def:12, poise:48,  desc:"低血嗜血双动" },
+  sorcerer: { name:"咒术师",     hp:196, atk:15, def:17, poise:78,  shield:.25, desc:"护盾+蓄力" },
+  butcher:  { name:"碎铠屠夫",   hp:247, atk:17, def:25, poise:85,  debuffOnHit:true, desc:"攻击附带碎甲" },
+  lord:     { name:"回廊之主",   hp:328, atk:16, def:31, poise:115, desc:"三阶段王权" },
+  bloodfang:{ name:"血牙领主",   hp:265, atk:18, def:21, poise:71,  lifesteal:.46, desc:"攻击吸血 46%" },
+  voidmage: { name:"虚空咒师",   hp:276, atk:17, def:21, poise:85,  shield:.29, blink:.29, desc:"闪现规避+双蓄力" },
+  golem:    { name:"磐岩傀儡",   hp:305, atk:15, def:51, poise:182, thorns:.25, desc:"反伤甲+极高韧性" },
+  shadow:   { name:"影刃刺客",   hp:224, atk:20, def:17, poise:60,  blink:.23, swift:true, desc:"迅捷追击+闪避" },
+  heart:    { name:"回廊之心",   hp:437, atk:18, def:35, poise:145, lifesteal:.29, desc:"四阶段·回廊意志" },
 };
 const ENDLESS_POOL = ["guard","berserker","sorcerer","butcher","bloodfang","voidmage","golem","shadow","lord"];
 const AFFIXES = [
@@ -249,6 +260,24 @@ const UP_INFO = {
   st:  { label:"呼吸法 · 体力 +15", base:8,  step:5 },
   pot: { label:"行囊 · 药剂 +1",    base:15, step:10, max:2 },
 };
+/* ==================== 技能图标（内联SVG，currentColor 描边） ==================== */
+const ICO = {
+  eagle:  `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="15"/><circle cx="24" cy="24" r="8"/><circle cx="24" cy="24" r="3.2" fill="currentColor" stroke="none"/><path d="M24 5v4M24 39v4M5 24h4M39 24h4"/></svg>`,
+  razor:  `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 35 L31 9 L37 13 L19 39 Z" fill="rgba(255,255,255,.12)"/><path d="M10 40 L17 33"/><path d="M8 42 L12 42 L12 38"/></svg>`,
+  thorn:  `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M24 7 L38 13 V25 C38 33.5 32 38.5 24 41.5 C16 38.5 10 33.5 10 25 V13 Z" fill="rgba(255,255,255,.08)"/><path d="M24 15 V37 M24 21 L18 17 M24 27 L30 23 M24 33 L18 29"/></svg>`,
+  hammer: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(45 24 24)"><rect x="13" y="8" width="22" height="10" rx="2.5" fill="rgba(255,255,255,.12)"/><rect x="21.5" y="16" width="5" height="24" rx="2"/></g></svg>`,
+  leech:  `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 L26 7 L27 28 L21 28 Z" fill="rgba(255,255,255,.12)"/><path d="M17 30 H31"/><path d="M24 30 V40"/><path d="M36 26 c0 0-4.5 5-4.5 8 a4.5 4.5 0 0 0 9 0 c0-3-4.5-8-4.5-8 Z" fill="#ff6a6a" stroke="#ff9a9a"/></svg>`,
+  will:   `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M24 6 C28 13 34 17 34 26 A10 10 0 0 1 14 26 C14 20 20 18 21 14 C23 18 24 19 24 19 C24 14 24 10 24 6 Z" fill="rgba(255,215,110,.22)"/><path d="M24 36 A5 5 0 0 0 29 28 C27 30 25 29 25 26"/></svg>`,
+  pouch:  `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14 H29 L26.5 19 H21.5 Z" fill="rgba(255,255,255,.1)"/><path d="M15 20 H33 L36 40 H12 Z" fill="rgba(127,216,160,.14)"/><path d="M24 25 V33 M20 29 H28"/></svg>`,
+  hunter: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 7 C30 15 30 33 14 41"/><path d="M14 7 V41"/><path d="M11 24 H38"/><path d="M38 24 L33 20 M38 24 L33 28"/></svg>`,
+  atk:    `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M24 6 L28 12 L28 29 L20 29 L20 12 Z" fill="rgba(255,255,255,.14)"/><path d="M16 31 H32"/><path d="M24 31 V41"/><circle cx="24" cy="43" r="1.6" fill="currentColor" stroke="none"/></svg>`,
+  hp:     `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M24 40 C13.5 32 8 26.5 8 19 A8.5 8.5 0 0 1 24 16 A8.5 8.5 0 0 1 40 19 C40 26.5 34.5 32 24 40 Z" fill="rgba(255,106,106,.2)"/><path d="M24 21 V32 M18.5 26.5 H29.5"/></svg>`,
+  st:     `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17 H30 a5 5 0 1 0-5-5"/><path d="M9 25 H37 a5 5 0 1 1-5 5"/><path d="M9 33 H25 a4 4 0 1 1-4 4"/></svg>`,
+  pot:    `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 7 H27.5 V13 L35 31 A4.5 4.5 0 0 1 30.8 38 H17.2 A4.5 4.5 0 0 1 13 31 L20.5 13 Z" fill="rgba(127,216,160,.16)"/><path d="M17 27 H31"/><path d="M24 31 V35 M21.5 33 H26.5"/></svg>`,
+};
+function iconSvg(id, tone){
+  return `<span class="ico ${tone||"gold"}">${ICO[id]||""}</span>`;
+}
 const RUN_KEY = "corridor_save_v5";
 const FLOOR_SOULS = f => 10 + f*5;
 
@@ -2385,7 +2414,7 @@ function showVictory(gain){
     <h3 class="win">${endless?"回廊之心 已被击败！":"第 "+meta.floor+" 层 · 通关"}</h3>
     <div class="sub">${endless?"回廊开始无限延伸——精英词缀将越来越常见":"获得回廊之魂 <span class='soul'>+"+gain+"</span>（当前 <span class='soul'>"+meta.souls+"</span>）"}</div>
     <div class="choices">
-      ${picks.map((r,i)=>`<div class="choice" onclick="pickRelic(${i})"><div class="cn">${r.name}</div><div class="cd">${r.desc}</div></div>`).join("")}
+      ${picks.map((r,i)=>`<div class="choice" onclick="pickRelic(${i})">${iconSvg(r.id,"gold")}<div class="cn">${r.name}</div><div class="cd">${r.desc}</div></div>`).join("")}
     </div>
     <button class="ovbtn gray" onclick="pickRelic(-1)">放弃遗物（+5 魂）</button>
   `, "victory");
@@ -2405,7 +2434,7 @@ function showLevelUp(){
         const u = UP_INFO[k], cost = upCost(k), maxed = u.max && meta.up[k] >= u.max;
         const cur = k==="atk"?playerAtk() : k==="hp"?playerMaxHp() : k==="st"?playerMaxSt() : meta.potions;
         return `<div class="upbtn" ${maxed||meta.souls<cost?"disabled":""} onclick="buyUpgrade('${k}')">
-          <div class="un">${u.label}</div><div class="uc">${maxed?"已满级":cost+" 魂"}</div>
+          ${iconSvg(k,"green")}<div class="un">${u.label}</div><div class="uc">${maxed?"已满级":cost+" 魂"}</div>
           <div class="ue">当前 ${cur}</div></div>`;
       }).join("")}
     </div>
@@ -2462,7 +2491,7 @@ function renderUI(){
   document.getElementById("stance-cost").textContent = STANCES[meta.stance].name;
   document.getElementById("btn-finisher").style.display = meta.combo >= 3 && !S.over ? "block" : "none";
   document.getElementById("bl-relics").innerHTML = meta.relics.length
-    ? meta.relics.map(id => { const r = RELICS.find(x=>x.id===id); return `<span>${r?r.name:id}</span>`; }).join("")
+    ? meta.relics.map(id => { const r = RELICS.find(x=>x.id===id); return `<span>${(ICO[id]||"")+(r?r.name:id)}</span>`; }).join("")
     : `<span style="opacity:.4">暂无遗物</span>`;
   unlockUI();
   if (S.over) lockUI();
