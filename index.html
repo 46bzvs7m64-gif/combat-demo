@@ -10,8 +10,11 @@
   .container { max-width:1080px; margin:0 auto; }
   h1 { font-size:21px; color:#e8e8f0; }
   .subtitle { font-size:12px; color:#8a8aa0; margin:4px 0 12px; }
-  .topbar { display:flex; justify-content:space-between; align-items:center; background:#181828; border:1px solid #2e2e4a; border-radius:8px; padding:7px 14px; margin-bottom:10px; font-size:12px; color:#bbb; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; background:#181828; border:1px solid #2e2e4a; border-radius:8px; padding:7px 100px 7px 14px; margin-bottom:10px; font-size:12px; color:#bbb; }
   .topbar b { color:#ffd76e; }
+  .music-btn { position:fixed; top:16px; right:18px; z-index:60; background:#23233c; border:1px solid #4a4a7a; color:#c7b3ff; border-radius:8px; padding:4px 11px; font-size:11.5px; cursor:pointer; transition:all .15s; letter-spacing:1px; }
+  .music-btn:hover { border-color:#ffd76e; color:#ffd76e; }
+  .music-btn.off { color:#777; opacity:.7; }
   .layout { display:flex; gap:12px; align-items:flex-start; }
   .main { flex:2.2; min-width:0; }
   .side { flex:1; min-width:250px; }
@@ -140,6 +143,7 @@
     <span>回廊之魂：<b id="ui-souls">0</b></span>
     <span id="ui-enemy-tag">-</span>
   </div>
+  <button class="music-btn" id="music-btn" onclick="AudioSys.toggle()">♪ 音乐·开</button>
 
   <div class="layout">
     <div class="main">
@@ -1386,6 +1390,7 @@ function tickQueue(dt){
 function startFloor(){
   hideOverlay();
   spawnEnemy(floorKey(meta.floor));
+  AudioSys.battle(meta.floor);
   S = { frame:0, turn:0, over:false, log:[],
         p:{ hp:playerMaxHp(), st:playerMaxSt(), guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0} },
         stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
@@ -2279,6 +2284,7 @@ function showMenu(){
     </div>
   `, "");
   startTitleScene();
+  AudioSys.title();
 }
 
 /* ==================== 标题画面：动态场景 ==================== */
@@ -2405,6 +2411,7 @@ function continueRun(){
   if (m && m.floor){ meta = m; startFloor(); } else newRun();
 }
 function showVictory(gain){
+  AudioSys.jingle("victory");
   const pool = RELICS.filter(r => !hasRelic(r.id));
   const picks = [];
   while (picks.length < 3 && pool.length) picks.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
@@ -2450,6 +2457,7 @@ function buyUpgrade(k){
   saveGame(); sysLog(`强化完成：${u.label}`); showLevelUp();
 }
 function showDeath(){
+  AudioSys.jingle("defeat");
   showOverlay(`
     <h3 class="lose">远征止步</h3>
     <div class="sub">你倒在了第 ${meta.floor} 层的 ${E.name} 面前。<br>魂与遗物不会消失——重整旗鼓，从这一层继续。</div>
@@ -2505,6 +2513,258 @@ S = { frame:0, turn:0, over:true, log:[],
 E = { type:"guard", name:"-", desc:"", maxhp:1, hp:1, poise:1, maxpoise:1, atk:0, def:0, phase:1, stunned:0,
       shield:0, maxshield:0, chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0}, intent:null, guarding:false,
       lifesteal:0, blink:0, thorns:0, swift:false, debuffOnHit:false, affix:null, affixName:"" };
+/* ==================== 程序化音乐系统（WebAudio 合成 · 无外部音频资源） ==================== */
+const AudioSys = (()=>{
+  let actx=null, masterG=null, musicBus=null, timer=0;
+  const MUTE_KEY="corridor_music_v1";
+  let muted = localStorage.getItem(MUTE_KEY)==="1";
+  let want = null;                 // 最近期望曲目（静音解除后续播）
+  const live = [];                // 活动序列/片段
+  const mtof = m => 440*Math.pow(2,(m-69)/12);
+  const SCALES = { minor:[0,2,3,5,7,8,10], dorian:[0,2,3,5,7,9,10], major:[0,2,4,5,7,9,11],
+    phryg:[0,1,3,5,7,8,10], pMaj:[0,2,4,7,9], hMinor:[0,2,3,5,7,8,11] };
+  /* 十层 BGM 风格表：与场景主题同构（调式/速度/配器/密度） */
+  const FLOOR_MUSIC = [
+    { root:45, sc:"dorian", bpm:92,  chords:[0,3,4,3], lead:"triangle", bass:.32, pad:.045, pluck:.15, drum:["k","h"],   dens:.5,  bright:680, bell:0    }, // 1 石砌回廊
+    { root:50, sc:"pMaj",   bpm:108, chords:[0,4,3,4], lead:"triangle", bass:.34, pad:.04,  pluck:.14, drum:["k","h"],   dens:.68, bright:900, bell:.55  }, // 2 菌光林苑
+    { root:40, sc:"phryg",  bpm:100, chords:[0,0,1,0], lead:"square",   bass:.4,  pad:.055, pluck:.085,drum:["k","s","h"],dens:.8, bright:600, bell:0   }, // 3 赤铜熔炉
+    { root:48, sc:"minor",  bpm:82,  chords:[0,5,3,4], lead:"sine",     bass:.25, pad:.055, pluck:.08, drum:[],          dens:.4,  bright:1200,bell:1   }, // 4 静默冰窟
+    { root:48, sc:"major",  bpm:104, chords:[0,4,5,3], lead:"triangle", bass:.33, pad:.05,  pluck:.16, drum:["k","s"],   dens:.72, bright:850, bell:.3  }, // 5 鎏金王座
+    { root:41, sc:"phryg",  bpm:118, chords:[0,0,5,3], lead:"square",   bass:.4,  pad:.055, pluck:.09, drum:["k","s","h"],dens:.9, bright:640, bell:0   }, // 6 血月地牢
+    { root:46, sc:"hMinor", bpm:94,  chords:[0,5,3,4], lead:"triangle", bass:.29, pad:.055, pluck:.15, drum:["h"],       dens:.62, bright:1050,bell:.65 }, // 7 奥术圣所
+    { root:38, sc:"minor",  bpm:72,  chords:[0,0,4,3], lead:"triangle", bass:.44, pad:.065, pluck:.085,drum:["k","s"],   dens:.5,  bright:560, bell:0    }, // 8 磐岩石窟
+    { root:43, sc:"minor",  bpm:130, chords:[0,1,0,6], lead:"square",   bass:.35, pad:.045, pluck:.09, drum:["k","s","h"],dens:1,   bright:720, bell:0   }, // 9 暗影裂隙
+    { root:45, sc:"hMinor", bpm:88,  chords:[0,5,3,4], lead:"triangle", bass:.4,  pad:.08,  pluck:.135,drum:["k","s"],   dens:.7,  bright:900, bell:.8  }, // 10 回廊之心
+  ];
+  const TITLE_MELODY = [ // C大调英雄主题（64个16分步，null=休止）
+    64,null,64,null,67,null,72,null, 71,null,69,null,67,null,64,null,
+    62,null,64,null,67,null,69,null, 67,null,64,null,60,null,null,null,
+    65,null,65,null,69,null,72,null, 71,null,69,null,65,null,64,null,
+    67,null,67,null,72,null,76,null, 74,null,72,null,67,null,null,null ];
+
+  function ensure(){
+    if (!actx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      actx = new AC();
+      masterG = actx.createGain(); masterG.gain.value = muted?0:1; masterG.connect(actx.destination);
+      musicBus = actx.createGain(); musicBus.gain.value = .9; musicBus.connect(masterG);
+    }
+    if (actx.state === "suspended") actx.resume();
+    return actx;
+  }
+  /* ---------- 乐器 ---------- */
+  function pluck(fr,t,dur,peak,type,dest,bellish){
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.type=type||"triangle";
+    o.frequency.setValueAtTime(fr,t);
+    o.frequency.exponentialRampToValueAtTime(fr*.985,t+dur);
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(peak,t+.008);
+    g.gain.exponentialRampToValueAtTime(.0006,t+dur);
+    o.connect(g); g.connect(dest); o.start(t); o.stop(t+dur+.05);
+    if (bellish){ const o2=actx.createOscillator(),g2=actx.createGain();
+      o2.type="sine"; o2.frequency.value=fr*2.003;
+      g2.gain.setValueAtTime(0,t); g2.gain.linearRampToValueAtTime(peak*.25,t+.01);
+      g2.gain.exponentialRampToValueAtTime(.0005,t+dur*.7);
+      o2.connect(g2); g2.connect(dest); o2.start(t); o2.stop(t+dur); }
+  }
+  function bassNote(fr,t,dur,peak,dest){
+    const o=actx.createOscillator(), f=actx.createBiquadFilter(), g=actx.createGain();
+    o.type="triangle"; o.frequency.value=fr; f.type="lowpass"; f.frequency.value=400;
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(peak,t+.012);
+    g.gain.exponentialRampToValueAtTime(.0007,t+dur);
+    o.connect(f); f.connect(g); g.connect(dest); o.start(t); o.stop(t+dur+.05);
+  }
+  function pad(notes,t,dur,peak,bright,dest){
+    notes.forEach(fr=>{
+      const o=actx.createOscillator(),o2=actx.createOscillator(),f=actx.createBiquadFilter(),g=actx.createGain();
+      o.type="sawtooth"; o2.type="sawtooth"; o.frequency.value=fr; o2.frequency.value=fr*1.005;
+      f.type="lowpass"; f.frequency.value=bright||700; f.Q.value=.4;
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(peak,t+Math.min(.5,dur*.3));
+      g.gain.linearRampToValueAtTime(peak*.72,t+dur*.65); g.gain.linearRampToValueAtTime(.0008,t+dur);
+      o.connect(f); o2.connect(f); f.connect(g); g.connect(dest);
+      o.start(t); o2.start(t); o.stop(t+dur+.1); o2.stop(t+dur+.1);
+    });
+  }
+  function bell(fr,t,dur,peak,dest){
+    [1,2.01,3.02].forEach((mul,i)=>{
+      const o=actx.createOscillator(),g=actx.createGain();
+      o.type="sine"; o.frequency.value=fr*mul;
+      const p=peak*(i===0?1:i===1?.35:.12), dd=dur*(i===0?1:.55);
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(p,t+.01);
+      g.gain.exponentialRampToValueAtTime(.0006,t+dd);
+      o.connect(g); g.connect(dest); o.start(t); o.stop(t+dd+.05);
+    });
+  }
+  function drum(t,kind,peak,dest){
+    if (kind==="k"){
+      const o=actx.createOscillator(),g=actx.createGain();
+      o.frequency.setValueAtTime(130,t); o.frequency.exponentialRampToValueAtTime(42,t+.12);
+      g.gain.setValueAtTime(peak,t); g.gain.exponentialRampToValueAtTime(.001,t+.19);
+      o.connect(g); g.connect(dest); o.start(t); o.stop(t+.21);
+    } else {
+      const len=kind==="s"?.18:.05;
+      const buf=actx.createBuffer(1,Math.floor(actx.sampleRate*len),actx.sampleRate);
+      const d=buf.getChannelData(0);
+      for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length, kind==="s"?1.3:3);
+      const src=actx.createBufferSource(); src.buffer=buf;
+      const f=actx.createBiquadFilter(); f.type="highpass"; f.frequency.value=kind==="s"?1100:6800;
+      const g=actx.createGain(); g.gain.value=peak*(kind==="s"?.9:.5);
+      src.connect(f); f.connect(g); g.connect(dest); src.start(t);
+    }
+  }
+  /* ---------- 调度器 ---------- */
+  function startTimer(){ if(!timer) timer=setInterval(tick,30); }
+  function tick(){
+    if(!actx) return;
+    const now=actx.currentTime;
+    for(const st of live){
+      if(st.kind!=="loop" || st.dying) continue;
+      while(st.nextTime < now+.13){
+        scheduleStep(st, st.step, st.nextTime);
+        st.nextTime += 60/st.cfg.bpm/4;
+        st.step++;
+        if(st.step>=64){ st.step=0; genMelody(st); }
+      }
+    }
+    for(let i=live.length-1;i>=0;i--){ const st=live[i];
+      if(st.removeAt && now>=st.removeAt){ try{ st.gain.disconnect(); }catch(e){} live.splice(i,1); } }
+    if(!live.length){ clearInterval(timer); timer=0; }
+  }
+  function degreeNote(root,sc,deg){
+    const s=SCALES[sc], n=s.length;
+    return root + s[((deg%n)+n)%n] + 12*Math.floor(deg/n);
+  }
+  function genMelody(st){
+    if(st.cfg.fixed){ st.mel=st.cfg.fixed.slice(); return; }
+    const c=st.cfg, dens=c.dens, out=new Array(64).fill(null);
+    let deg=5;
+    for(let i=0;i<64;i++){
+      const inBar=i%16;
+      if(i%8===0 && Math.random()<.55){ deg=[0,2,4][Math.floor(Math.random()*3)]+7; } // 强拍落和弦音
+      else { deg += (Math.random()<.5?-1:1)*(1+Math.floor(Math.random()*2)); deg=Math.max(-1,Math.min(12,deg)); }
+      const restChance = (inBar%2)? .55 : .32+.34*(1-dens);
+      if(Math.random()>restChance) out[i]=degreeNote(c.root,c.sc,deg)+12;
+    }
+    st.mel=out;
+  }
+  function scheduleStep(st,i,t){
+    const c=st.cfg, dest=st.gain, spb=60/c.bpm/4;
+    const bar=Math.floor(i/16), inBar=i%16;
+    const chordDeg=c.chords[bar%c.chords.length];
+    const chordRoot=degreeNote(c.root,c.sc,chordDeg);
+    // pad：每小节一个和弦
+    if(inBar===0) pad([chordRoot+12,degreeNote(c.root,c.sc,chordDeg+2)+12,degreeNote(c.root,c.sc,chordDeg+4)+12],
+                      t, spb*16+.15, c.pad, c.bright, dest);
+    // 贝斯
+    const bassHits = c.dens>=.85?[0,7,10,14]:[0,7,10];
+    if(bassHits.includes(inBar)){
+      let deg=chordDeg, peak=c.bass;
+      if(inBar===7) deg=chordDeg;
+      if(inBar===10) deg=chordDeg+4;
+      if(inBar===14) deg=chordDeg+7;
+      bassNote(mtof(degreeNote(c.root,c.sc,deg)-12), t, spb*2.4, peak, dest);
+    }
+    // 主旋律 / 钟琴
+    const note=st.mel[i];
+    if(note!=null){
+      if(c.bell>0 && Math.random()<c.bell) bell(mtof(note),t,spb*3.2,c.pluck*.85,dest);
+      else { const soft = c.lead==="square" ? c.pluck : c.pluck;
+        pluck(mtof(note),t,spb*3.4,soft,c.lead,dest, c.bell>0 && Math.random()<.25); }
+    }
+    // 打击乐
+    const has=k=>c.drum.includes(k);
+    const fourFloor = c.endless || c.dens>=.98;
+    if(has("k") && (fourFloor?inBar%4===0:(inBar===0||inBar===8))) drum(t,"k",.5,dest);
+    if(has("s") && (inBar===4||inBar===12)) drum(t,"s",.2,dest);
+    if(has("h") && inBar%2===0) drum(t,"h", inBar%4===2?.13:.08, dest);
+  }
+  function spawn(cfg,vol){
+    const g=actx.createGain(); g.gain.value=0; g.connect(musicBus);
+    g.gain.linearRampToValueAtTime(vol||.9, actx.currentTime+1.5);
+    const st={ kind:"loop", cfg, gain:g, step:0, mel:[], nextTime:actx.currentTime+.08 };
+    genMelody(st);
+    for(const o of live){ if(!o.dying){ o.dying=true;
+      o.gain.gain.cancelScheduledValues(actx.currentTime);
+      o.gain.gain.setTargetAtTime(o.gain.gain.value,actx.currentTime,.05);
+      o.gain.gain.linearRampToValueAtTime(0,actx.currentTime+1.3);
+      o.removeAt=actx.currentTime+2.2; } }
+    live.push(st); startTimer();
+  }
+  /* ---------- 对外曲目 ---------- */
+  function title(){
+    want={fn:title};
+    if(muted||!ensure()) return;
+    spawn({ root:48, sc:"major", bpm:92, chords:[0,4,5,3], lead:"triangle",
+      bass:.3, pad:.05, pluck:.16, drum:["k","h"], dens:.7, bright:800, bell:.35, fixed:TITLE_MELODY }, .85);
+  }
+  function battle(floor){
+    want={fn:battle,arg:floor};
+    if(muted||!ensure()) return;
+    let cfg;
+    if(floor<=10) cfg=FLOOR_MUSIC[floor-1];
+    else cfg=Object.assign({},FLOOR_MUSIC[(floor-1)%10],{ bpm:FLOOR_MUSIC[(floor-1)%10].bpm+14,
+      dens:Math.min(1,FLOOR_MUSIC[(floor-1)%10].dens+.18), endless:true });
+    spawn(cfg,.9);
+  }
+  function jingle(kind){
+    want={fn:jingle,arg:kind};
+    if(muted||!ensure()) return;
+    const g=actx.createGain(); g.gain.value=0; g.connect(musicBus);
+    g.gain.linearRampToValueAtTime(.95,actx.currentTime+.35);
+    for(const o of live){ if(!o.dying){ o.dying=true;
+      o.gain.gain.cancelScheduledValues(actx.currentTime);
+      o.gain.gain.setTargetAtTime(o.gain.gain.value,actx.currentTime,.05);
+      o.gain.gain.linearRampToValueAtTime(0,actx.currentTime+1);
+      o.removeAt=actx.currentTime+1.8; } }
+    const t0=actx.currentTime+.15, dur=kind==="victory"?7.9:8.4;
+    if(kind==="victory"){
+      pad([60,64,67],t0,1.9,.06,1400,g); drum(t0,"k",.55,g);
+      pluck(mtof(72),t0,.5,.17,"triangle",g,1);
+      pluck(mtof(76),t0+.5,.5,.17,"triangle",g,1);
+      pluck(mtof(79),t0+1,.5,.17,"triangle",g,1);
+      bell(mtof(84),t0+1.5,1.9,.16,g);
+      pad([65,69,72],t0+2.2,1.6,.055,1300,g);
+      pluck(mtof(81),t0+2.2,.5,.16,"triangle",g);
+      pluck(mtof(77),t0+2.75,.95,.16,"triangle",g);
+      pad([67,71,74],t0+3.7,1.6,.055,1300,g);
+      pluck(mtof(79),t0+3.7,.5,.16,"triangle",g);
+      pluck(mtof(83),t0+4.15,.95,.16,"triangle",g,1);
+      drum(t0+5,"k",.6,g); drum(t0+5.9,"k",.4,g);
+      pad([60,64,67,72],t0+5,2.9,.06,1500,g);
+      [72,76,79,84].forEach((m,i)=> pluck(mtof(m),t0+5+i*.18,.7,.14,"triangle",g));
+      bell(mtof(84),t0+5.54,2.6,.17,g);
+    } else {
+      pad([45,48,52],t0,3.6,.075,520,g);
+      bassNote(mtof(33),t0+.2,2,.3,g); drum(t0+.2,"k",.4,g); drum(t0+4,"k",.35,g);
+      [[69,.2,1.7],[67,1.9,1.6],[65,3.6,1.6],[64,5.3,2.8]].forEach(([m,dt,d])=> pluck(mtof(m),t0+dt,d,.15,"triangle",g,1));
+      pad([41,45,48],t0+3.9,2.2,.06,560,g);
+      pad([40,44,47],t0+5.5,2.9,.06,640,g);
+      bell(mtof(57),t0+5.5,2.6,.08,g);
+    }
+    live.push({ kind:"jingle", gain:g, removeAt:t0+dur+.4 });
+    startTimer();
+  }
+  function toggle(){
+    muted=!muted;
+    try{ localStorage.setItem(MUTE_KEY,muted?"1":"0"); }catch(e){}
+    const btn=document.getElementById("music-btn");
+    if(btn){ btn.textContent = muted?"♪ 音乐·关":"♪ 音乐·开"; btn.classList.toggle("off",muted); }
+    if(!actx){ if(!muted && want){ const w=want; want=null; w.fn(w.arg); } return; }
+    masterG.gain.cancelScheduledValues(actx.currentTime);
+    masterG.gain.linearRampToValueAtTime(muted?0:1,actx.currentTime+.2);
+    if(!muted){ ensure(); if(want){ const w=want; want=null; w.fn(w.arg); } }
+  }
+  // 浏览器自动播放策略：首次交互时唤醒并续上标题曲
+  document.addEventListener("pointerdown",()=>{
+    if(!muted && actx && actx.state==="suspended") actx.resume();
+    if(!muted && !actx && want && want.fn===title){ const w=want; want=null; title(); }
+  },{ once:false });
+  const btn0=document.getElementById("music-btn");
+  if(btn0){ btn0.textContent = muted?"♪ 音乐·关":"♪ 音乐·开"; if(muted) btn0.classList.add("off"); }
+  return { title, battle, jingle, toggle };
+})();
+
 showMenu();
 </script>
 </body>
