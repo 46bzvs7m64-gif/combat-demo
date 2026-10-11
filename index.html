@@ -229,26 +229,26 @@
 "use strict";
 /* ==================== 敌人总表（含各层独有技能标记） ==================== */
 const ENEMIES = {
-  guard:    { name:"回廊守卫",   hp:213, atk:13, def:31, poise:67,  desc:"标准重甲" },
-  berserker:{ name:"血狂战士",   hp:184, atk:16, def:12, poise:48,  desc:"低血嗜血双动" },
-  sorcerer: { name:"咒术师",     hp:196, atk:15, def:17, poise:78,  shield:.25, desc:"护盾+蓄力" },
-  butcher:  { name:"碎铠屠夫",   hp:247, atk:17, def:25, poise:85,  debuffOnHit:true, desc:"攻击附带碎甲" },
-  lord:     { name:"回廊之主",   hp:328, atk:16, def:31, poise:115, desc:"三阶段王权" },
-  bloodfang:{ name:"血牙领主",   hp:265, atk:18, def:21, poise:71,  lifesteal:.46, desc:"攻击吸血 46%" },
-  voidmage: { name:"虚空咒师",   hp:276, atk:17, def:21, poise:85,  shield:.29, blink:.29, desc:"闪现规避+双蓄力" },
-  golem:    { name:"磐岩傀儡",   hp:305, atk:15, def:51, poise:182, thorns:.25, desc:"反伤甲+极高韧性" },
-  shadow:   { name:"影刃刺客",   hp:224, atk:20, def:17, poise:60,  blink:.23, swift:true, desc:"迅捷追击+闪避" },
-  heart:    { name:"回廊之心",   hp:437, atk:18, def:35, poise:145, lifesteal:.29, desc:"四阶段·回廊意志" },
+  guard:    { name:"回廊守卫",   hp:195, atk:12, def:24, poise:60,  desc:"标准重甲" },
+  berserker:{ name:"血狂战士",   hp:175, atk:15, def:11, poise:46,  desc:"低血嗜血双动" },
+  sorcerer: { name:"咒术师",     hp:188, atk:14, def:16, poise:72,  shield:.22, desc:"护盾+蓄力" },
+  butcher:  { name:"碎铠屠夫",   hp:238, atk:16, def:23, poise:80,  debuffOnHit:true, desc:"攻击附带碎甲" },
+  lord:     { name:"回廊之主",   hp:295, atk:15, def:28, poise:108, desc:"三阶段王权" },
+  bloodfang:{ name:"血牙领主",   hp:255, atk:17, def:20, poise:68,  lifesteal:.38, desc:"攻击吸血 38%" },
+  voidmage: { name:"虚空咒师",   hp:268, atk:16, def:20, poise:80,  shield:.26, blink:.26, desc:"闪现规避+双蓄力" },
+  golem:    { name:"磐岩傀儡",   hp:280, atk:13, def:32, poise:150, thorns:.10, desc:"反伤甲+高韧性" },
+  shadow:   { name:"影刃刺客",   hp:218, atk:19, def:16, poise:56,  blink:.22, swift:true, desc:"迅捷追击+闪避" },
+  heart:    { name:"回廊之心",   hp:340, atk:17, def:30, poise:125, lifesteal:.10, desc:"四阶段·回廊意志" },
 };
 const ENDLESS_POOL = ["guard","berserker","sorcerer","butcher","bloodfang","voidmage","golem","shadow","lord"];
 const AFFIXES = [
-  { id:"fury",   name:"狂暴",   desc:"伤害 +30%" },
-  { id:"regen",  name:"再生",   desc:"每回合回复 3% 生命" },
-  { id:"thorn",  name:"荆棘",   desc:"反伤 25%" },
-  { id:"swift",  name:"迅捷",   desc:"35% 追击" },
-  { id:"shielded", name:"壁垒", desc:"获得 20% 护盾" },
+  { id:"fury",   name:"狂暴",   desc:"伤害 +20%" },
+  { id:"regen",  name:"再生",   desc:"每回合回复 2% 生命" },
+  { id:"thorn",  name:"荆棘",   desc:"反伤 20%" },
+  { id:"swift",  name:"迅捷",   desc:"30% 追击" },
+  { id:"shielded", name:"壁垒", desc:"获得 18% 护盾" },
   { id:"plague", name:"毒疫",   desc:"每回合使玩家中毒 +1 层" },
-  { id:"frost",  name:"冰寒",   desc:"攻击命中 25% 冰冻玩家 1 回合" },
+  { id:"frost",  name:"冰寒",   desc:"攻击命中 20% 冰冻玩家 1 回合" },
 ];
 /* 十层固定编排 */
 const FLOORS = [null,"guard","berserker","sorcerer","butcher","lord","bloodfang","voidmage","golem","shadow","heart"];
@@ -295,8 +295,8 @@ const RELICS = [
   { id:"longember",  name:"长明火种", r:"c", desc:"篝火回血 40% → 60%" },
 ];
 const UP_INFO = {
-  atk: { label:"利刃 · 攻击 +4",    base:9,  step:5 },
-  hp:  { label:"铁骨 · 生命 +20",   base:10, step:6 },
+  atk: { label:"利刃 · 攻击 +5",    base:9,  step:5 },
+  hp:  { label:"铁骨 · 生命 +25",   base:10, step:6 },
   st:  { label:"呼吸法 · 体力 +15", base:8,  step:5 },
   pot: { label:"行囊 · 药剂 +1",    base:15, step:10, max:2 },
 };
@@ -413,8 +413,8 @@ const FLOOR_SOULS = f => 10 + f*5;
 
 /* ==================== 存档与全局 ==================== */
 let meta = null, S = null, E = null;
-const playerAtk  = () => 26 + (meta?meta.up.atk:0)*4;
-const playerMaxHp= () => 110 + (meta?meta.up.hp:0)*20;
+const playerAtk  = () => 26 + (meta?meta.up.atk:0)*5;
+const playerMaxHp= () => 120 + (meta?meta.up.hp:0)*25;
 const playerMaxSt= () => 100 + (meta?meta.up.st:0)*15;
 const hasRelic = id => meta && meta.relics.includes(id);
 /* —— v6 辅助：毒强化 / 魂收益 / 生命持久化 / 遗物抽取 —— */
@@ -1587,8 +1587,8 @@ function startFloor(){
 function spawnEnemy(key, eliteCnt){
   const t = ENEMIES[key], f = meta.floor;
   let sHp, sAtk;
-  if (f <= 10){ sHp = 1 + .108*(f-1); sAtk = 1 + .078*(f-1); }
-  else { sHp = 1.96 + .105*(f-10); sAtk = 1.7 + .065*(f-10); }
+  if (f <= 10){ sHp = 1 + .088*(f-1); sAtk = 1 + .062*(f-1); }
+  else { sHp = 1.792 + .095*(f-10); sAtk = 1.558 + .055*(f-10); }
   E = { type:key, name:t.name, desc:t.desc,
     maxhp:Math.round(t.hp*sHp), atk:+(t.atk*sAtk).toFixed(1), def:t.def,
     maxpoise:Math.round(t.poise*(1+.06*(Math.min(f,10)-1))),
@@ -1605,10 +1605,10 @@ function spawnEnemy(key, eliteCnt){
     E.affixList.push(aff.id);
     E.affix = aff.id;
     E.affixName = E.affixName ? E.affixName+"·"+aff.name : aff.name;
-    if (aff.id === "fury") E.atk = +(E.atk*1.3).toFixed(1);
-    if (aff.id === "thorn") E.thorns = Math.max(E.thorns, .25);
+    if (aff.id === "fury") E.atk = +(E.atk*1.2).toFixed(1);
+    if (aff.id === "thorn") E.thorns = Math.max(E.thorns, .20);
     if (aff.id === "swift") E.swift = true;
-    if (aff.id === "shielded") { E.maxshield = Math.round(E.maxhp*.2); E.shield = E.maxshield; }
+    if (aff.id === "shielded") { E.maxshield = Math.round(E.maxhp*.18); E.shield = E.maxshield; }
   }
   E.hp = E.maxhp; E.poise = E.maxpoise;
   if (E.maxshield) E.shield = E.maxshield;
@@ -2276,11 +2276,11 @@ function enemyPhase(){
   }
   if (E.type === "berserker" && E.phase === 2 && it.type === "atk")
     evs.push({ atk:true, mult:.8, name:"嗜血追击", style:"dash" });
-  if (E.swift && it.type === "atk" && Math.random() < .35)
+  if (E.swift && it.type === "atk" && Math.random() < .30)
     evs.push({ atk:true, mult:.7, name:"迅捷追击", style:"dash" });
-  if (E.affix === "swift" && it.type === "atk" && Math.random() < .35)
+  if (E.affix === "swift" && it.type === "atk" && Math.random() < .30)
     evs.push({ atk:true, mult:.7, name:"迅捷追击", style:"dash" });
-  if (E.affix === "regen") evs.push({ regen:.03 });
+  if (E.affix === "regen") evs.push({ regen:.02 });
 
   runSeq(evs.map(e => {
     if (e.phaseMsg !== undefined) return { dur:600, start:()=>{
@@ -2364,7 +2364,7 @@ function enemyHit(mult, name, ranged, drain, keepDodge){
       if (p.debuffs.vuln < DEBUFFS.vuln.max) p.debuffs.vuln++;
       note += " · <span class='dmg'>碎甲</span>（易伤+1）";
     }
-    if (E.affixList && E.affixList.includes("frost") && p.debuffs.frozen < 1 && Math.random() < .25){
+    if (E.affixList && E.affixList.includes("frost") && p.debuffs.frozen < 1 && Math.random() < .20){
       p.debuffs.frozen = 1;
       note += " · <span style='color:#7ab8ff'>冰寒冻结</span>（玩家下回合无法行动）";
     }
