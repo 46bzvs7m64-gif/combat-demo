@@ -525,39 +525,41 @@ function drawPlayerBody(x,y){
   const pLfl = PS.lfl||0, pLbl = PS.lbl||0, cr = PS.cr||0, ln = PS.ln||0;
   // 躯干前倾：以脚底为轴剪切上躯干（正=朝敌方）
   if (ln){ cx.save(); cx.translate(x,y); cx.transform(1,0,-ln,1,0,0); cx.translate(-x,-y); }
-  // 披风
-  poly([x-3,y-90-cr, x-31+sway,y-58-cr, x-21+sway,y-6, x-3,y-12, x+2,y-60-cr], fc("#3d4fa0",f));
-  cx.fillStyle = "#2a3775"; poly2(x-3,y-90-cr,x-31+sway,y-58-cr,x-21+sway,y-6);
+  // 披风（圣骑白披风 + 金边）
+  poly([x-3,y-90-cr, x-31+sway,y-58-cr, x-21+sway,y-6, x-3,y-12, x+2,y-60-cr], fc("#eef1f7",f));
+  cx.fillStyle = "#aeb8c8"; poly2(x-3,y-90-cr,x-31+sway,y-58-cr,x-21+sway,y-6);
+  cx.strokeStyle = "rgba(240,198,96,.9)"; cx.lineWidth = 2;
+  cx.beginPath(); cx.moveTo(x-3,y-90-cr); cx.lineTo(x-31+sway,y-58-cr); cx.lineTo(x-21+sway,y-6); cx.lineTo(x-3,y-12); cx.stroke();
   // 腿+靴（髋部随蹲身下沉，双脚跨步/抬离 —— 走出真实步态）
-  limb(x-6,y-32-cr, x-10+pLf, y-6-pLfl, "#41509a",7);
-  limb(x+7,y-32-cr, x+11+pLb, y-6-pLbl, "#41509a",7);
-  cx.fillStyle=fc("#1a2142",f); rr(x-15+pLf,y-9-pLfl,10,8,3); cx.fill(); rr(x+5+pLb,y-9-pLbl,10,8,3); cx.fill();
+  limb(x-6,y-32-cr, x-10+pLf, y-6-pLfl, "#c2cad8",7);
+  limb(x+7,y-32-cr, x+11+pLb, y-6-pLbl, "#c2cad8",7);
+  cx.fillStyle=fc("#4b5262",f); rr(x-15+pLf,y-9-pLfl,10,8,3); cx.fill(); rr(x+5+pLb,y-9-pLbl,10,8,3); cx.fill();
   // 后臂（绕肩关节 x-10,y-72-cr 摆动）
   const baS = { x:x-10, y:y-72-cr };
   const baE = rot2(baS, x-16, y-40-cr, pBa*1.1);
-  limb(baS.x,baS.y, baE.x,baE.y,"#4a5cc0",6);
-  // 躯干胸甲
-  poly([x-15,y-78-cr, x+15,y-78-cr, x+12,y-32-cr, x-12,y-32-cr], fc(vgrad(y-78-cr,y-32-cr,"#6d8ce8","#31439b"),f));
-  cx.fillStyle=fc("#8fa9f2",f); rr(x-4,y-70-cr,8,22,3); cx.fill();      // 中脊
+  limb(baS.x,baS.y, baE.x,baE.y,"#dfe5ef",6);
+  // 躯干胸甲（铂金甲：高光银白 → 枪铁灰）
+  poly([x-15,y-78-cr, x+15,y-78-cr, x+12,y-32-cr, x-12,y-32-cr], fc(vgrad(y-78-cr,y-32-cr,"#fbfcff","#aeb9cc"),f));
+  cx.fillStyle=fc("#ffffff",f); rr(x-4,y-70-cr,8,22,3); cx.fill();      // 中脊高光
   cx.fillStyle="#ffd76e"; cx.beginPath(); cx.arc(x,y-58-cr,3.2,0,7); cx.fill(); // 金扣
   belt(x,y-38-cr,30);
   // 肩甲
-  pauldron(x+15,y-74-cr,fc("#7d97e8",f),7); pauldron(x-15,y-74-cr,fc("#5f74c0",f),6);
-  // 头：兜帽+脸+护额
-  cx.fillStyle=fc("#33418f",f); cx.beginPath(); cx.arc(x,y-88-cr,13.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.stroke();
+  pauldron(x+15,y-74-cr,fc("#f2f5fa",f),7); pauldron(x-15,y-74-cr,fc("#c6cfdd",f),6);
+  // 头：白兜帽+脸+护额
+  cx.fillStyle=fc("#d7deea",f); cx.beginPath(); cx.arc(x,y-88-cr,13.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.8; cx.stroke();
   cx.fillStyle=fc("#e8b58c",f); cx.beginPath(); cx.arc(x+1,y-86-cr,8.5,0,7); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=1.3; cx.stroke();
   cx.fillStyle=OUT; cx.beginPath(); cx.arc(x,y-88-cr,12.8,Math.PI*0.92,Math.PI*2.08); cx.fill();
-  cx.fillStyle="#9fe8ff"; cx.shadowColor="#7fd8ff"; cx.shadowBlur=9; rr(x+3,y-89-cr,5,3*eyeOpen(),1.5); cx.fill(); cx.shadowBlur=0;
-  // 前臂+长剑（金格蓝刃）：绕肩关节 x+12,y-70-cr 挥摆，剑随手腕联动
+  cx.fillStyle="#ffe9a8"; cx.shadowColor="#ffcf6e"; cx.shadowBlur=9; rr(x+3,y-89-cr,5,3*eyeOpen(),1.5); cx.fill(); cx.shadowBlur=0;
+  // 前臂+长剑（金格银刃）：绕肩关节 x+12,y-70-cr 挥摆，剑随手腕联动
   const armSwing = Math.sin(V.t/480)*0.05;
   const shF = { x:x+12, y:y-70-cr };
   const swa = -pSw*0.9;
   const hd = rot2(shF, x+19, y-44-cr, swa);
-  limb(shF.x,shF.y, hd.x,hd.y,"#5a6fd0",6);
+  limb(shF.x,shF.y, hd.x,hd.y,"#e8edf5",6);
   cx.save(); cx.translate(hd.x+1,hd.y); cx.rotate(-0.42+armSwing + pSw*1.55);
   cx.fillStyle="#4a3418"; cx.fillRect(-2,0,4,10);
   cx.fillStyle="#f0c060"; rr(-9,-4,18,5,2); cx.fill();
-  const bg=cx.createLinearGradient(-3,-70,3,-70); bg.addColorStop(0,"#7fb8e8"); bg.addColorStop(.5,"#f8fcff"); bg.addColorStop(1,"#7fb8e8");
+  const bg=cx.createLinearGradient(-3,-70,3,-70); bg.addColorStop(0,"#b8c2d2"); bg.addColorStop(.5,"#ffffff"); bg.addColorStop(1,"#b8c2d2");
   cx.fillStyle=fc(bg,f); poly([-3,-4, 3,-4, 2,-72, 0,-78, -2,-72]);
   bladeGlint(-1,-12, 1,-68, 2200);
   cx.restore();
@@ -565,7 +567,7 @@ function drawPlayerBody(x,y){
   [-7, 7].forEach((hx,i)=>{
     const swp = Math.sin(V.t/700+i)*1.2;
     cx.strokeStyle="#3a2c18"; cx.lineWidth=1.4; cx.beginPath(); cx.moveTo(x+hx,y-31-cr); cx.lineTo(x+hx+swp,y-25-cr); cx.stroke();
-    cx.fillStyle=i?"#7fd8a0":"#ff8a6a"; cx.save(); cx.translate(x+hx+swp,y-21-cr);
+    cx.fillStyle=i?"#f0c96a":"#ff6a6a"; cx.save(); cx.translate(x+hx+swp,y-21-cr);
     rr(-2.6,-5,5.2,9,2); cx.fill(); cx.strokeStyle=OUT; cx.lineWidth=.8; cx.stroke();
     cx.fillStyle="rgba(255,255,255,.5)"; rr(-1.8,-3.5,1.4,3,1); cx.fill();
     cx.fillStyle="#5a4a2a"; rr(-1.6,-7,3.2,2.4,1); cx.fill();
