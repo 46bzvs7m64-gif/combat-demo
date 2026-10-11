@@ -35,6 +35,60 @@
   .log .dmg { color:#ff8a8a; font-weight:700; }
   .log .crit { color:#ffd76e; font-weight:700; }
   .log .heal { color:#7fd8a0; }
+  .log .frm { color:#6a6a8a; font-size:9px; }
+  .log .formula { color:#8a8aa0; font-size:9.5px; margin-left:2px; }
+  .log .formula b { color:#c792ea; font-weight:400; }
+  .log .formula .atk { color:#ffd76e; }
+  .log .formula .mult { color:#ff8a8a; }
+  .log .formula .def { color:#7ab8ff; }
+  .log .formula .crit { color:#ffd76e; }
+  .log .formula .weak { color:#7fd8a0; }
+  /* 帧数据表 */
+  .frame-table { width:100%; font-size:9.5px; border-collapse:collapse; }
+  .frame-table th { color:#8a8aa0; font-weight:400; padding:3px 2px; text-align:center; border-bottom:1px solid #2a2a44; }
+  .frame-table td { color:#d0d0e0; padding:3px 2px; text-align:center; border-bottom:1px solid #1e1e34; }
+  .frame-table td.name { color:#e8e8f0; font-weight:600; text-align:left; padding-left:4px; }
+  .frame-table tr.sel { background:#2a2a4d; }
+  .frame-table .elem-fire { color:#ff7a4a; }
+  .frame-table .elem-thunder { color:#ffd76e; }
+  .frame-table .elem-dark { color:#c792ea; }
+  /* 意图威胁等级 */
+  .threat { display:inline-block; padding:1px 6px; border-radius:8px; font-size:9px; font-weight:700; }
+  .threat.low { background:#1a3a24; color:#7fd8a0; }
+  .threat.mid { background:#3a3418; color:#ffd76e; }
+  .threat.high { background:#3a1818; color:#ff8a8a; }
+  .threat.deadly { background:#3a0d2a; color:#ff7ac8; }
+  /* 处决窗口 */
+  .exec-window { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:40;
+    background:rgba(255,215,110,.12); border:2px solid #ffd76e; border-radius:50%; width:90px; height:90px;
+    display:flex; align-items:center; justify-content:center; animation:execPulse .6s ease-in-out infinite; }
+  .exec-window .ew-txt { font-size:11px; color:#ffd76e; font-weight:700; text-align:center; line-height:1.3; }
+  @keyframes execPulse { 0%,100%{box-shadow:0 0 20px rgba(255,215,110,.5)} 50%{box-shadow:0 0 40px rgba(255,215,110,.8)} }
+  /* BOSS设计文档 */
+  .phase-doc { text-align:left; font-size:11px; }
+  .phase-doc h4 { color:#ffd76e; font-size:13px; margin:10px 0 4px; border-bottom:1px solid #3a3a5c; padding-bottom:3px; }
+  .phase-doc .phase-row { display:flex; gap:8px; align-items:center; padding:4px 0; border-bottom:1px solid #23233c; }
+  .phase-doc .phase-num { width:42px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; flex:none; }
+  .phase-doc .p1 { background:#2a4a6a; color:#8ad0ff; }
+  .phase-doc .p2 { background:#4a3a18; color:#ffd76e; }
+  .phase-doc .p3 { background:#4a1a1a; color:#ff8a8a; }
+  .phase-doc .p4 { background:#3a0d2a; color:#ff7ac8; }
+  .phase-doc .phase-detail { flex:1; }
+  .phase-doc .phase-hp { color:#8a8aa0; font-size:10px; }
+  .phase-doc .phase-intent { color:#c0c0d0; font-size:10px; margin-top:2px; }
+  .phase-doc .phase-special { color:#ff8a8a; font-size:10px; margin-top:2px; }
+  /* Build流派引导 */
+  .build-guide { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .build-card { background:#23233c; border:1px solid #3a3a5c; border-radius:10px; padding:12px; text-align:left; }
+  .build-card h5 { font-size:13px; margin-bottom:6px; }
+  .build-card.poise h5 { color:#ff7a4a; }
+  .build-card.crit h5 { color:#c792ea; }
+  .build-card .bl-desc { font-size:10px; color:#9aa; line-height:1.5; margin-bottom:6px; }
+  .build-card .bl-relic { font-size:9.5px; color:#c7b3ff; margin-bottom:3px; }
+  .build-card .bl-stat { font-size:9.5px; color:#9aa; }
+  .build-card .bl-dps { font-size:11px; color:#ffd76e; font-weight:700; margin-top:4px; }
+  .doc-btn { background:#2a2a4d; border:1px solid #4a4a7a; color:#c7b3ff; padding:4px 10px; border-radius:6px; font-size:10px; cursor:pointer; margin-left:6px; }
+  .doc-btn:hover { background:#3a3a6d; }
   .stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; }
   .stat-grid .st { background:#23233c; border-radius:6px; padding:5px 8px; }
   .stat-grid .st .l { font-size:9.5px; color:#8a8aa0; }
@@ -202,7 +256,40 @@
         </div>
       </div>
       <div class="panel">
-        <h2>战斗日志 <span class="hint">帧级记录</span></h2>
+        <h2>帧数据 <span class="hint">动作帧表·白盒</span><button class="doc-btn" onclick="showPhaseDoc()">BOSS设计</button></h2>
+        <div style="margin-bottom:6px">
+          <div style="font-size:10px;color:#8a8aa0;margin-bottom:3px">玩家招式</div>
+          <table class="frame-table">
+            <thead><tr><th>招式</th><th>前摇</th><th>判定</th><th>后摇</th><th>总帧</th><th>削韧</th><th>倍率</th><th>体力</th></tr></thead>
+            <tbody id="player-frame-table"></tbody>
+          </table>
+        </div>
+        <div style="border-top:1px solid #2a2a44;padding-top:6px">
+          <div style="font-size:10px;color:#8a8aa0;margin-bottom:3px">敌人意图 <span id="intent-threat" style="float:right"></span></div>
+          <div id="intent-frame-info" style="font-size:10px;color:#c0c0d0;line-height:1.6">等待行动...</div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>流派引导 <span class="hint">双Build通关证明</span></h2>
+        <div class="build-guide">
+          <div class="build-card poise">
+            <h5>⚔ 重击削韧流</h5>
+            <div class="bl-desc">重击高削韧快速破韧→处决3.0×无视防御，速攻型</div>
+            <div class="bl-relic">核心遗物：碎甲锤·猎人直觉·战意</div>
+            <div class="bl-stat">加点：攻击优先，副体力</div>
+            <div class="bl-dps">理论DPS ≈ 85/回合</div>
+          </div>
+          <div class="build-card crit">
+            <h5>🗡 轻击暴击流</h5>
+            <div class="bl-desc">低体力消耗高频连击→终结技4.0×必暴，持续型</div>
+            <div class="bl-relic">核心遗物：剃刀·鹰眼·吸血剑</div>
+            <div class="bl-stat">加点：攻击优先，副生命</div>
+            <div class="bl-dps">理论DPS ≈ 78/回合</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>战斗日志 <span class="hint">帧级记录·含公式拆解</span></h2>
         <div class="log" id="log"></div>
       </div>
       <div class="panel">
@@ -1616,14 +1703,32 @@ function spawnEnemy(key, eliteCnt){
 const playerDmg = (mult, targetDef, crit, critMult, elem) => {
   let def = targetDef;
   if (E.debuffs.breakd > 0) def = Math.round(def * (1 - DEBUFFS.breakd.defPen));
-  let d = playerAtk() * mult * defRed(def) * (crit ? critMult : 1) * (0.9 + Math.random()*0.2);
-  if (elem && WEAKNESS[E.type] === elem) d *= ELEMENTS[elem].weakBonus;
-  if (elem && WEAKNESS[E.type] === "any") d *= 1.2;
-  if (E.debuffs.vuln > 0) d *= (1 + DEBUFFS.vuln.dmgUp);
-  if (E.guarding) d *= 0.5;
+  const atk = playerAtk();
+  const dr = defRed(def);
+  const cm = crit ? critMult : 1;
+  const fl = 0.9 + Math.random()*0.2;
+  let wk = 1;
+  if (elem && WEAKNESS[E.type] === elem) wk = ELEMENTS[elem].weakBonus;
+  else if (elem && WEAKNESS[E.type] === "any") wk = 1.2;
+  const vul = E.debuffs.vuln > 0 ? (1 + DEBUFFS.vuln.dmgUp) : 1;
+  const gd = E.guarding ? 0.5 : 1;
+  let d = atk * mult * dr * cm * fl * wk * vul * gd;
+  // 记录公式拆解供日志使用
+  S.lastFormula = { atk, mult, defRed:+dr.toFixed(3), defAfter:def, crit:cm, float:+fl.toFixed(3), weak:wk, vuln:vul, guard:gd };
   return Math.max(1, Math.round(d));
 };
 const enemyDmg = mult => Math.max(1, Math.round(E.atk*mult*(E.affixList&&E.affixList.includes("fury")?1.3:1)*(0.9+Math.random()*0.2)));
+/* 伤害公式拆解字符串 */
+function formulaStr(d){
+  const f = S.lastFormula;
+  if (!f) return "";
+  let s = `<span class="formula">= <span class="atk">${f.atk}</span>×<span class="mult">${f.mult}</span>×<span class="def">${f.defRed}</span>×<span class="crit">${f.crit}</span>×<span class="weak">${f.float}</span>`;
+  if (f.weak !== 1) s += `×<span class="weak">${f.weak}</span>`;
+  if (f.vuln !== 1) s += `×<span style="color:#ff8a8a">${f.vuln}</span>`;
+  if (f.guard !== 1) s += `×<span style="color:#8a8aa0">${f.guard}</span>`;
+  s += ` = <b>${d}</b></span>`;
+  return s;
+}
 
 /* ==================== 意图系统 ==================== */
 function rollIntent(){
@@ -1746,6 +1851,7 @@ function playerAct(kind){
   if (kind === "riposte"){
     const mult = hasRelic("hunter")?4.0:3.0;
     const d = Math.round(playerAtk()*mult*1.5);
+    S.lastFormula = { atk:playerAtk(), mult, defRed:1, defAfter:0, crit:1.5, float:1, weak:1, vuln:1, guard:1, exec:true };
     const L = E_BASE.x-P_BASE.x-70;
     const OVER = L+46; // 瞬步穿过敌人身侧
     const hitF = {};   // 命中只结算一次（穿越身位的瞬间）
@@ -1785,6 +1891,7 @@ function playerAct(kind){
               floatText(E_BASE.x-10, E_BASE.y-198, "处  决", "#e8d5ff", 16, { big:true });
               burst(E_BASE.x-20, E_BASE.y-70, 34, "#c792ea", 3.6, 1.2);
               burst(E_BASE.x-20, E_BASE.y-70, 16, "#ffd76e", 2.6, 1.6);
+              addLog(`<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> <b style="color:#c792ea">处决</b> → <span class="crit">${d}</span>${formulaStr(d)} <span style="color:#8a8aa0">（无视防御）</span>`);
               ringFx(E_BASE.x-20, E_BASE.y-70, "rgba(199,146,234,.95)");
               ringFx(E_BASE.x-20, E_BASE.y-70, "rgba(255,255,255,.7)");
               // 白刃横贯光弧
@@ -1829,6 +1936,7 @@ function playerAct(kind){
     if (meta.combo < 3){ sysLog("连击不足（需 3 层）"); S.turn--; renderUI(); return; }
     meta.combo = 0;
     const d = Math.round(playerAtk()*4.0*1.5);
+    S.lastFormula = { atk:playerAtk(), mult:4.0, defRed:1, defAfter:0, crit:1.5, float:1, weak:1, vuln:1, guard:1, exec:true };
     const L = E_BASE.x-P_BASE.x-60, hit = {};
     runSeq([
       // 蓄力蹲身（双手举剑过头，屈膝下沉）
@@ -1866,7 +1974,7 @@ function playerAct(kind){
             ringFx(P_BASE.x+L, P_BASE.y-8, "rgba(255,215,110,.6)");
             V.shake = 20; V.fullflash = .5; V.p.sq = .58; V.cz = 1.14;
             V.p.cr = 16; V.p.lf = 12;
-            addLog(`<span class="crit">终结技</span> → ${d} 伤害（4× 必暴击）`);
+            addLog(`<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> <span class="crit">终结技</span> → ${d}${formulaStr(d)} <span style="color:#8a8aa0">（必暴击·无视防御）</span>`);
           }
         } },
       // 落地恢复
@@ -2008,7 +2116,7 @@ function hitEnemy(d, crit, mv, shTxt, elemTxt, poiseMul){
   floatText(E_BASE.x+V.e.ox-20, E_BASE.y-150, `${d}`, crit?"#ffd76e":"#ff8a8a", crit?28:21, { big:crit });
   if (crit) burst(E_BASE.x+V.e.ox-24, E_BASE.y-90, 8, "#ffd76e", 1.4, 1.6);
   if (elemTxt) floatText(E_BASE.x+V.e.ox+28, E_BASE.y-128, "克制!", ELEMENTS[mv.elem].color, 14, { big:true });
-  addLog(`<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> 玩家 <b>${mv.name}</b>（${ELEMENTS[mv.elem].name}）→ ${crit?`<span class="crit">暴击 ${d}</span>`:`<span class="dmg">${d}</span>`} · 削韧 ${pd}${shTxt}${elemTxt}`);
+  addLog(`<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> 玩家 <b>${mv.name}</b>（${ELEMENTS[mv.elem].name}）→ ${crit?`<span class="crit">暴击 ${d}</span>`:`<span class="dmg">${d}</span>`}${formulaStr(d)} · 削韧 ${pd}${shTxt}${elemTxt}`);
   // 磐岩/荆棘反伤
   if (E.thorns > 0 && d > 0){
     const ref = Math.round(d * E.thorns * (meta.stance==="def"?0.8:1));
@@ -2502,6 +2610,7 @@ function showMenu(){
     <div class="title-btns">
       <button class="title-btn primary" onclick="newRun()">⚔ 开始新的远征</button>
       ${saved && saved.floor ? `<button class="title-btn secondary" onclick="continueRun()">继续远征（第 ${saved.floor} 层 · ${saved.souls||0} 魂）</button>` : ""}
+      <button class="title-btn secondary" onclick="showDesignPhilosophy()">📖 战斗设计理念</button>
     </div>
 
     <div class="title-help">
@@ -2915,8 +3024,169 @@ function renderUI(){
   document.getElementById("bl-relics").innerHTML = meta.relics.length
     ? meta.relics.map(id => { const r = RELICS.find(x=>x.id===id); return `<span>${(ICO[id]||"")+(r?r.name:id)}</span>`; }).join("")
     : `<span style="opacity:.4">暂无遗物</span>`;
+  renderFrameData();
   unlockUI();
   if (S.over) lockUI();
+}
+/* 帧数据面板渲染 */
+function renderFrameData(){
+  const moves = [
+    { name:"轻击", elem:"fire", startup:2, active:1, recovery:1, poise:hasRelic("hammer")?15:10, mult:1.0, cost:25 },
+    { name:"重击", elem:"thunder", startup:4, active:1, recovery:3, poise:hasRelic("hammer")?38:25, mult:1.8, cost:40 },
+    { name:"处决", elem:"dark", startup:2, active:1, recovery:2, poise:0, mult:3.0, cost:0 },
+    { name:"终结技", elem:"dark", startup:3, active:1, recovery:3, poise:0, mult:4.0, cost:35 },
+    { name:"格挡", elem:"", startup:1, active:1, recovery:1, poise:0, mult:0, cost:15 },
+    { name:"闪避", elem:"", startup:1, active:1, recovery:1, poise:0, mult:0, cost:20 }
+  ];
+  const tb = document.getElementById("player-frame-table");
+  if (tb) tb.innerHTML = moves.map(m=>{
+    const total = m.startup+m.active+m.recovery;
+    return `<tr><td class="name elem-${m.elem}">${m.name}</td><td>${m.startup}</td><td>${m.active}</td><td>${m.recovery}</td><td><b>${total}</b></td><td>${m.poise||"-"}</td><td>${m.mult?m.mult+"×":"-"}</td><td>${m.cost}</td></tr>`;
+  }).join("");
+  // 敌人意图帧数据
+  const info = document.getElementById("intent-frame-info");
+  const thr = document.getElementById("intent-threat");
+  if (E && E.poise === 0 && !S.over){
+    if (thr) thr.innerHTML = `<span class="threat deadly">处决窗口!</span>`;
+    if (info) info.innerHTML = `<b style="color:#ffd76e">⚡ 敌人倒地！</b><br>处决 3.0× 无视防御<br><span style="color:#8a8aa0">本回合内有效</span>`;
+    return;
+  }
+  if (E && E.intent){
+    const it = E.intent;
+    const startupFrames = it.heavy?6:(it.ranged?5:3);
+    let threat = "low";
+    const rawDmg = (E.atk||0)*(it.mult||1);
+    if (rawDmg > 45) threat = "deadly";
+    else if (rawDmg > 28) threat = "high";
+    else if (rawDmg > 15) threat = "mid";
+    const thrName = {low:"低", mid:"中", high:"高", deadly:"致命"}[threat];
+    if (thr) thr.innerHTML = `<span class="threat ${threat}">威胁 ${thrName}</span>`;
+    if (info){
+      let html = `<b style="color:#e8e8f0">${it.name}</b> · 倍率 <b style="color:#ff8a8a">${(it.mult||1).toFixed(1)}×</b> · 前摇 <b style="color:#ffd76e">${startupFrames}帧</b>`;
+      html += `<br>预估伤害：<b style="color:#ff8a8a">${Math.round(rawDmg)}</b>（未计防御减免）`;
+      if (it.ranged) html += `<br><span style="color:#c792ea">远程·无法被格挡反伤</span>`;
+      if (it.heavy) html += `<br><span style="color:#ff8a8a">蓄力·可被闪避</span>`;
+      if (it.flurry) html += `<br><span style="color:#ffd76e">连击·多段伤害</span>`;
+      info.innerHTML = html;
+    }
+  } else if (info){
+    info.innerHTML = "等待行动...";
+    if (thr) thr.innerHTML = "";
+  }
+}
+/* BOSS 阶段设计文档（战斗策划交付物） */
+const BOSS_DESIGN = {
+  guard: { name:"回廊守卫", phases:[
+    { n:1, hp:"100%→60%", intent:"盾击(1.0×) / 横扫(1.3×)", special:"举盾防御回合：受伤-50%，削韧减半" },
+    { n:2, hp:"<60%", intent:"狂暴：所有攻击 ×1.3", special:"狂暴解锁高伤连击" }
+  ]},
+  berserker: { name:"血狂战士", phases:[
+    { n:1, hp:"100%→40%", intent:"挥砍(1.0×) / 跳劈(1.5×) / 防御", special:"高韧性，需重击破韧" },
+    { n:2, hp:"<40%", intent:"嗜血：每回合双动", special:"低血量狂暴，需快速处决" }
+  ]},
+  sorcerer: { name:"秘法术士", phases:[
+    { n:1, hp:"100%→50%", intent:"远程法球(1.2×) / 蓄力(2.0×) / 护盾", special:"远程攻击无法被格挡反伤" },
+    { n:2, hp:"<50%", intent:"狂暴 ×1.2 + 蓄力频率↑", special:"护盾重塑：优先破盾" }
+  ]},
+  butcher: { name:"屠户", phases:[
+    { n:1, hp:"100%→45%", intent:"重劈(1.6×) / 横扫(1.3×) / 突刺(1.0×)", special:"前摇长，可闪避躲开" },
+    { n:2, hp:"<45%", intent:"狂暴 ×1.25：三连斩", special:"连击多段，格挡减伤" }
+  ]},
+  lord: { name:"回廊之主", phases:[
+    { n:1, hp:"100%→70%", intent:"王权横扫(1.4×) / 突刺(1.0×) / 防御", special:"均衡型BOSS" },
+    { n:2, hp:"70%→35%", intent:"狂暴 ×1.25 + 解锁蓄力", special:"狂暴后伤害显著提升" },
+    { n:3, hp:"<35%", intent:"末日蓄力(2.5×) 频率↑", special:"蓄力回合受伤+50%，是输出窗口" }
+  ]},
+  bloodfang: { name:"血牙", phases:[
+    { n:1, hp:"100%→50%", intent:"扑咬(1.2×·吸血) / 三连(0.6××3) / 影遁", special:"吸血机制，拖战不利" },
+    { n:2, hp:"<50%", intent:"狂暴 ×1.3：吸血强化至 20%", special:"需爆发击杀，避免持久战" }
+  ]},
+  voidmage: { name:"虚空法师", phases:[
+    { n:1, hp:"100%→55%", intent:"远程法球(1.3×) / 闪现 / 护盾", special:"30%闪现规避攻击" },
+    { n:2, hp:"<55%", intent:"狂暴 ×1.2：闪现频率↑", special:"持续输出压制闪现" }
+  ]},
+  golem: { name:"岩像守卫", phases:[
+    { n:1, hp:"100%→60%", intent:"重拳(1.5×) / 滚压(1.8×) / 石化愈合", special:"反伤25%，高防御高韧性" },
+    { n:2, hp:"<60%", intent:"狂暴 ×1.2：岩球滚压频率↑", special:"反伤机制，避免被反伤击杀" }
+  ]},
+  shadow: { name:"暗影刺客", phases:[
+    { n:1, hp:"100%→50%", intent:"影袭(1.3×) / 三连(0.5××3) / 影遁", special:"迅捷：前摇短，需预判" },
+    { n:2, hp:"<50%", intent:"狂暴 ×1.3：背刺暴击", special:"低血量爆发，注意闪避" }
+  ]},
+  heart: { name:"回廊之心", phases:[
+    { n:1, hp:"100%→75%", intent:"汲取(1.2×·吸血) / 升空咒束(1.5×)", special:"最终BOSS，四阶段转换" },
+    { n:2, hp:"75%→50%", intent:"解锁末日蓄力(2.2×)", special:"心律加速，攻击频率↑" },
+    { n:3, hp:"50%→25%", intent:"吸血强化至 25%", special:"心悸：吸血增强，需爆发" },
+    { n:4, hp:"<25%", intent:"狂暴 ×1.35：最终爆发", special:"最终阶段，全力输出/处决" }
+  ]}
+};
+function showPhaseDoc(){
+  if (!E || !E.type){ sysLog("无当前BOSS数据"); return; }
+  const design = BOSS_DESIGN[E.type];
+  if (!design){ sysLog("该敌人无设计文档"); return; }
+  let html = `<div class="phase-doc">`;
+  html += `<h4>《${design.name}》战斗设计文档</h4>`;
+  const wk = WEAKNESS[E.type];
+  const wkName = wk === "any" ? "无属性弱点(全属性1.2×)" : ELEMENTS[wk].name;
+  const wkColor = wk === "any" ? "#c0c0d0" : ELEMENTS[wk].color;
+  html += `<div style="color:#8a8aa0;font-size:10px;margin-bottom:8px">弱点：<b style="color:${wkColor}">${wkName}</b> · 韧性：${E.maxpoise} · 防御：${E.def} · 攻击：${E.atk}</div>`;
+  html += `<h4>阶段转换与意图模式</h4>`;
+  design.phases.forEach(p=>{
+    html += `<div class="phase-row">
+      <div class="phase-num p${p.n}">P${p.n}</div>
+      <div class="phase-detail">
+        <div class="phase-hp">血量阈值：${p.hp}</div>
+        <div class="phase-intent">意图：${p.intent}</div>
+        <div class="phase-special">${p.special}</div>
+      </div>
+    </div>`;
+  });
+  html += `<h4>设计要点</h4>`;
+  html += `<div style="color:#c0c0d0;font-size:10px;line-height:1.7">
+    · 阶段转换通过血量阈值触发，狂暴倍率递增制造压力曲线<br>
+    · 蓄力回合受伤+50%是核心输出窗口，需在防御与进攻间抉择<br>
+    · 削韧→处决是对抗高防/高韧BOSS的关键路径（处决3.0×无视防御）<br>
+    · 弱点克制提供1.5×伤害，鼓励属性build选择
+  </div>`;
+  html += `</div>`;
+  showOverlay(`<h3 style="text-align:left;color:#ffd76e;margin-bottom:10px">BOSS 设计文档</h3>${html}`);
+}
+/* 战斗设计理念（策划交付物 · 设计支柱与风险收益） */
+function showDesignPhilosophy(){
+  const html = `<div class="phase-doc">
+    <h4>核心设计支柱</h4>
+    <div style="color:#c0c0d0;font-size:11px;line-height:1.8">
+      <b style="color:#ffd76e">支柱一：帧级节奏约束</b><br>
+      每个招式由前摇(startup)→判定(active)→后摇(recovery)三帧段构成，体力槽作为第二重资源约束。前摇期间可被打断，后摇期间无法行动——玩家必须在"输出"与"安全"间做每帧级决策，而非无脑连点。<br><br>
+      <b style="color:#ff8a8a">支柱二：削韧—处决的风险收益博弈</b><br>
+      重击削韧值25（轻击仅10），但前摇4帧+后摇3帧=8帧总帧（轻击仅4帧）。高削韧换来的是更长的暴露窗口。韧性槽打空后敌人倒地1回合，处决3.0×无视防御——这是对抗高防BOSS的核心路径，但破韧过程本身是高风险投入。<br><br>
+      <b style="color:#7fd8a0">支柱三：意图预告驱动的回合博弈</b><br>
+      敌人每回合预告意图（攻击/蓄力/防御/特殊），玩家据此选择：防御回合削韧减半→适合上debuff；蓄力回合受伤+50%→是爆发输出窗口。这把回合制从"数值对撞"升级为"信息博弈"。<br><br>
+      <b style="color:#c792ea">支柱四：双Build可通关的数值验证</b><br>
+      重击削韧流（速攻·处决爆发）与轻击暴击流（连击·终结技4.0×）经数值模拟均可通关十层。伤害公式全程白盒：ATK×倍率×防御减免×暴击×浮动×克制，所有参数实时可调。
+    </div>
+    <h4>帧数据速查</h4>
+    <table class="frame-table" style="margin:8px 0">
+      <thead><tr><th>招式</th><th>前摇</th><th>判定</th><th>后摇</th><th>总帧</th><th>削韧</th><th>倍率</th></tr></thead>
+      <tbody>
+        <tr><td class="name elem-fire">轻击</td><td>2</td><td>1</td><td>1</td><td><b>4</b></td><td>10</td><td>1.0×</td></tr>
+        <tr><td class="name elem-thunder">重击</td><td>4</td><td>1</td><td>3</td><td><b>8</b></td><td>25</td><td>1.8×</td></tr>
+        <tr><td class="name elem-dark">处决</td><td>2</td><td>1</td><td>2</td><td><b>5</b></td><td>-</td><td>3.0×</td></tr>
+        <tr><td class="name elem-dark">终结技</td><td>3</td><td>1</td><td>3</td><td><b>7</b></td><td>-</td><td>4.0×</td></tr>
+      </tbody>
+    </table>
+    <h4>肉鸽系统设计</h4>
+    <div style="color:#c0c0d0;font-size:11px;line-height:1.8">
+      · <b>路线房间</b>：战斗40%/精英20%/事件20%/商店15%/篝火15%，防连刷机制保证节奏<br>
+      · <b>16枚遗物</b>：普通/稀有分级，精英1.5×魂+保底稀有，build多样性来自遗物组合<br>
+      · <b>HP持久化</b>：血量跨房间保留，篝火回复而非回满——资源管理贯穿整个run<br>
+      · <b>异常跨房传递</b>：中毒/冰冻状态带入下一房间，增加连续战斗的策略深度
+    </div>
+    <div style="text-align:center;margin-top:14px">
+      <button class="doc-btn" onclick="hideOverlay()" style="font-size:12px;padding:8px 20px">关 闭</button>
+    </div>
+  </div>`;
+  showOverlay(`<h3 style="text-align:left;color:#ffd76e;margin-bottom:10px">战斗设计理念</h3>${html}`);
 }
 
 /* ==================== 启动 ==================== */
