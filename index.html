@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>试炼回廊 · Canvas 动作回合制战斗 V5</title>
+<title>试炼回廊 · Canvas 动作回合制战斗 V6</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#1a1a2e; background:#0c0c16; padding:14px; }
@@ -212,13 +212,15 @@
           敌人头顶有<b style="color:#ffd76e">意图预告</b>：攻击/蓄力/防御/特殊——防御回合削韧减半，适合上增益<br>
           轻击=火(灼烧) 重击=雷(破防) 处决系=暗(易伤) · 弱点命中 1.5×<br>
           韧性破 → 倒地1回合+处决 3.0× · 连击满3 → 终结技 4.0×<br>
-          站位：前压命中+15%受伤+20% / 后撤命中-10%受伤-20%
+          站位：前压命中+15%受伤+20% / 后撤命中-10%受伤-20%<br>
+          <b style="color:#7fd8a0">中毒</b>=每回合损失 4×层数 HP · <b style="color:#7ab8ff">❄冰冻</b>=跳过 1 回合<br>
+          通关战斗后<b style="color:#ffd76e">选择路线</b>：战斗/精英/事件/商店/篝火——精英 1.5×魂+保底稀有遗物，商店 3 枚货架随层刷新
         </div>
       </div>
     </div>
   </div>
 
-  <div class="footer">试炼回廊 V5 · 十层各具独有技能的 BOSS · 意图预告与精英词缀 · github.com/46bzvs7m64-gif/combat-demo</div>
+  <div class="footer">试炼回廊 V6 · 肉鸽路线房间（战斗/精英/事件/商店/篝火）· 中毒/冰冻异常 · 16 枚遗物 · github.com/46bzvs7m64-gif/combat-demo</div>
 </div>
 
 <div class="overlay" id="overlay"><div class="ov-panel" id="ov-panel"></div></div>
@@ -245,6 +247,8 @@ const AFFIXES = [
   { id:"thorn",  name:"荆棘",   desc:"反伤 25%" },
   { id:"swift",  name:"迅捷",   desc:"35% 追击" },
   { id:"shielded", name:"壁垒", desc:"获得 20% 护盾" },
+  { id:"plague", name:"毒疫",   desc:"每回合使玩家中毒 +1 层" },
+  { id:"frost",  name:"冰寒",   desc:"攻击命中 25% 冰冻玩家 1 回合" },
 ];
 /* 十层固定编排 */
 const FLOORS = [null,"guard","berserker","sorcerer","butcher","lord","bloodfang","voidmage","golem","shadow","heart"];
@@ -263,6 +267,8 @@ const DEBUFFS = {
   burn:   { name:"灼烧", max:3, dot:8,   color:"#ff7a4a" },
   breakd: { name:"破防", max:3, defPen:.5, color:"#ffd76e" },
   vuln:   { name:"易伤", max:3, dmgUp:.3, color:"#c792ea" },
+  poison: { name:"中毒", max:5, dot:4,   color:"#7fd8a0" },
+  frozen: { name:"冰冻", max:1,          color:"#7ab8ff" },
 };
 const STANCES = {
   neutral: { name:"中立", hit:0,   taken:1.0 },
@@ -278,6 +284,15 @@ const RELICS = [
   { id:"will",   name:"战意",     desc:"每回合体力回复 10 → 16" },
   { id:"pouch",  name:"老兵药囊", desc:"药剂 +1，恢复 35 → 45" },
   { id:"hunter", name:"猎人直觉", desc:"处决 3.0× → 4.0×" },
+  /* —— v6 扩充：r = "c" 普通 / "r" 稀有 —— */
+  { id:"venomfang",  name:"淬毒牙刃", r:"c", desc:"火系命中 40% 使敌人中毒 +1 层" },
+  { id:"frostsigil", name:"冰寒印记", r:"c", desc:"雷系命中 30% 冻结敌人 1 回合" },
+  { id:"catalyst",   name:"剧毒催化剂", r:"r", desc:"中毒上限 5→7，毒伤 4→6 / 层" },
+  { id:"warmheart",  name:"余烬之心", r:"c", desc:"灼烧与中毒对敌人伤害 +50%" },
+  { id:"tide",       name:"血潮之约", r:"r", desc:"击败敌人时回复 15% 最大生命" },
+  { id:"secondwind", name:"背水一战", r:"r", desc:"回合末生命低于 30% 时回复 8" },
+  { id:"gildscale",  name:"镀金秤",   r:"c", desc:"商店价 -25%，事件魂收益 +50%" },
+  { id:"longember",  name:"长明火种", r:"c", desc:"篝火回血 40% → 60%" },
 ];
 const UP_INFO = {
   atk: { label:"利刃 · 攻击 +4",    base:9,  step:5 },
@@ -285,6 +300,68 @@ const UP_INFO = {
   st:  { label:"呼吸法 · 体力 +15", base:8,  step:5 },
   pot: { label:"行囊 · 药剂 +1",    base:15, step:10, max:2 },
 };
+/* ==================== v6 路线房间与事件 ==================== */
+const ROOM_META = {
+  combat:  { ico:"atk",    name:"遭遇战",   desc:"标准战斗 · 稳定获得回廊之魂" },
+  elite:   { ico:"hammer", name:"精英战",   desc:"词缀强敌 · 1.5× 魂 + 必得稀有遗物" },
+  event:   { ico:"eagle",  name:"未知遭遇", desc:"回廊异象 · 机遇与代价并存" },
+  shop:    { ico:"pouch",  name:"流亡商人", desc:"用魂购买遗物、药剂与治疗" },
+  bonfire: { ico:"will",   name:"回廊篝火", desc:"休整：回复生命 / 药剂 / 灵魂" },
+};
+const EVENTS = [
+  { id:"altar", ico:"leech", name:"渗血祭坛",
+    text:"回廊深处一座漆黑石坛，凹槽里的暗红液体缓慢流动，低语声在你脑中盘旋：『献上祭品……换取回廊的馈赠……』",
+    opts:[
+      { label:"献上 15 魂", can:()=>meta.souls>=15, act(){ meta.souls-=15; return bloodOffer("你将魂倾入凹槽，祭坛震颤。"); } },
+      { label:"献上 1 瓶药剂", can:()=>meta.potions>=1, act(){ meta.potions--; return bloodOffer("药剂在凹槽中蒸发，泛起微光。"); } },
+      { label:"献出 15% 生命", act(){ addHp(-Math.round(playerMaxHp()*.15)); return bloodOffer("鲜血涌入凹槽，低语声满意地退去。"); } },
+      { label:"转身离开", act(){ return "低语声化作叹息。你头也不回地走开了。"; } },
+    ]},
+  { id:"swamp", ico:"pot", name:"毒沼浅滩",
+    text:"一条泛着荧绿的浅滩拦住去路，水面浮着细密气泡，嗅久了太阳穴隐隐发麻。对岸似乎有什么东西在反光。",
+    opts:[
+      { label:"涉水而过", act(){ pendDeb("poison",2); const g=soulGain(25); meta.souls+=g; return `毒液渗入伤口（<b>中毒 +2 层</b>，下一场战斗生效），你在对岸拾得 <span class='soul'>+${g}</span> 魂。`; } },
+      { label:"绕行远路", act(){ return "你多花了一个时辰绕行，平安无事，但一无所获。"; } },
+      { label:"俯身饮泉", act(){ pendDeb("poison",3); const r=grantRelic(1); return r?`泉水剧毒入喉（<b>中毒 +3 层</b>），但毒沼深处浮现馈赠——获得遗物「${r.name}」！`:"泉水剧毒入喉（<b>中毒 +3 层</b>），水中再无他物。"; } },
+    ]},
+  { id:"knight", ico:"thorn", name:"冰封骑士",
+    text:"一名骑士保持着拔剑的姿态被冻在冰壁之中，面甲后的目光竟似还在追猎。他手中的剑柄上嵌着一枚幽蓝宝石。",
+    opts:[
+      { label:"拔剑夺取", act(){ if (Math.random()<.5){ const r=grantRelic(1); return r?`冰壁应声碎裂！你从骑士手中夺得遗物「${r.name}」。身后传来一声几不可闻的叹息。`:"你夺下了剑柄——但宝石早已风化成尘。"; } addHp(-20); return "冰壁轰然炸裂，碎冰如刀——<b>-20 HP</b>。骑士的手指还保持着握剑的弧度。"; } },
+      { label:"致意后离开", act(){ const g=soulGain(8); meta.souls+=g; return `你向骑士低头致意。穿过冰廊时，脚边悄然多出几枚魂晶（<span class='soul'>+${g}</span>）。`; } },
+    ]},
+  { id:"gambler", ico:"eagle", name:"回廊赌徒",
+    text:"披着破烂斗篷的骷髅盘坐在路中央，面前摆着一对骨骰。它抬起头：『赌一把？赢家带走双倍……输家嘛，骸骨都很诚实的。』",
+    opts:[
+      { label:"押上 20 魂", can:()=>meta.souls>=20, act(){ meta.souls-=20; if (Math.random()<.6){ meta.souls+=40; return `骨骰定格——<b>你赢了！</b>骷髅不情愿地推来魂晶（<span class='soul'>+40</span>）。`; } return `骨骰定格——<b>你输了。</b>骷髅咧着牙床收走了你的 <span class='dmg'>20 魂</span>。`; } },
+      { label:"转身离开", act(){ return "『不赌就不亏……没劲。』骷髅悻悻地收起骨骰。"; } },
+    ]},
+  { id:"lantern", ico:"will", name:"缚魂灯笼",
+    text:"悬在半空的青铜灯笼里囚着一簇不肯熄灭的魂火。它轻轻摇曳着，像是渴望被添进新的燃料——或者做一笔交易。",
+    opts:[
+      { label:"献出 20% 当前生命", act(){ const cost=Math.max(1,Math.round((meta.hp==null?playerMaxHp():meta.hp)*.2)); addHp(-cost); const g=soulGain(30); meta.souls+=g; return `魂火贪婪地吞噬你的血气（<b>-${cost} HP</b>），作为交换留下 <span class='soul'>+${g}</span> 魂。`; } },
+      { label:"献上 1 瓶药剂", can:()=>meta.potions>=1, act(){ meta.potions--; const g=soulGain(15); meta.souls+=g; return `灯芯把药剂烧得噼啪作响，火光转盛，落下 <span class='soul'>+${g}</span> 魂。`; } },
+      { label:"吹灭它", act(){ return "你鼓足气吹向灯笼——魂火只是晃了晃。『省省吧，凡人。』"; } },
+    ]},
+  { id:"armory", ico:"hammer", name:"锈蚀军械库",
+    text:"一间半塌的军械库，锈蚀的刀剑堆到齐腰深。翻动的话难免被锈刃割伤，但说不定能从夹缝里找到前任持有者的遗物。",
+    opts:[
+      { label:"翻找武器架", act(){ if (Math.random()<.6){ const r=grantRelic(0); return r?`锈铁哗啦作响——你在架底摸到一枚温热的遗物「${r.name}」！`:"翻遍全场，只找到一堆比你还旧的锈铁。"; } addHp(-15); return "一柄锈剑突然崩断，划过你的手臂——<b>-15 HP</b>。血珠滴在锈铁上，滋滋作响。"; } },
+      { label:"原路离开", act(){ return "你谨慎地退了出去。回廊里，谨慎通常活得更久。"; } },
+    ]},
+  { id:"statue", ico:"razor", name:"低语石像",
+    text:"石像的面孔已被摸得模糊，唇部却异常光滑，仿佛仍在开合。基座上刻着：『倾听者得财，妄语者得焚。』",
+    opts:[
+      { label:"触摸石像倾听", act(){ if (Math.random()<.5){ const g=soulGain(35); meta.souls+=g; return `耳边的低语化作一篇古老诗篇，回廊的馈赠自石像掌心涌出（<span class='soul'>+${g}</span> 魂）。`; } pendDeb("burn",3); return "低语骤然变成尖啸——石像的呼吸是灼热的（<b>灼烧 +3 层</b>，下一场战斗生效）。"; } },
+      { label:"献 10 魂祈求", can:()=>meta.souls>=10, act(){ meta.souls-=10; const g=soulGain(25); meta.souls+=g; return `石像的唇停止了开合。一枚温热的魂晶落入你掌心（<span class='soul'>+${g}</span> 魂，净赚 ${g-10}）。`; } },
+    ]},
+  { id:"grave", ico:"atk", name:"无名墓碑",
+    text:"路旁斜插着一柄断剑，下面埋着不知是谁的遗骸。碑文早被磨平，只剩一行小字：『取我财者，担我命。』",
+    opts:[
+      { label:"默哀片刻", act(){ const g=soulGain(12); meta.souls+=g; return `风穿过回廊，似有叹息。碑前散落的魂晶静静发亮（<span class='soul'>+${g}</span>）。`; } },
+      { label:"掘开墓穴", act(){ if (Math.random()<.6){ if (Math.random()<.5){ const g=soulGain(30); meta.souls+=g; return `墓穴深处藏着前人的积蓄（<span class='soul'>+${g}</span> 魂）。愿他安息。`; } meta.potions++; return "墓穴里躺着一瓶保存完好的药剂（<b>药剂 +1</b>）。酿造它的人用不上了。"; } addHp(-15); pendDeb("poison",1); return "掘墓时被腐液溅了满手——<b>-15 HP，中毒 +1 层</b>。墓主人显然不欢迎访客。"; } },
+    ]},
+];
 /* ==================== 技能图标（内联SVG，多图层渐变） ==================== */
 const ICO = {
   /* 鹰眼：机瞄刻环 + 琥珀虹膜 + 瞳孔高光 */
@@ -324,6 +401,48 @@ const playerAtk  = () => 26 + (meta?meta.up.atk:0)*4;
 const playerMaxHp= () => 110 + (meta?meta.up.hp:0)*20;
 const playerMaxSt= () => 100 + (meta?meta.up.st:0)*15;
 const hasRelic = id => meta && meta.relics.includes(id);
+/* —— v6 辅助：毒强化 / 魂收益 / 生命持久化 / 遗物抽取 —— */
+const poisonMax = () => hasRelic("catalyst") ? 7 : 5;
+const poisonDot = () => hasRelic("catalyst") ? 6 : 4;
+const soulGain  = n => Math.round(hasRelic("gildscale") ? n*1.5 : n);
+function addHp(n){
+  const cur = meta.hp == null ? playerMaxHp() : meta.hp;
+  meta.hp = Math.max(0, Math.min(playerMaxHp(), cur + n));
+  if (S && S.p) S.p.hp = meta.hp;
+}
+function pendDeb(k, n){ meta.pendingDeb[k] = (meta.pendingDeb[k]||0) + n; }
+function drawRelicPool(n, minRare){
+  const commons = RELICS.filter(r => !meta.relics.includes(r.id) && (r.r||"c")==="c");
+  const rares   = RELICS.filter(r => !meta.relics.includes(r.id) && r.r==="r");
+  const picks = [];
+  const take = arr => { if (arr.length){ picks.push(arr.splice(Math.floor(Math.random()*arr.length),1)[0]); return true; } return false; };
+  while (picks.length < n && (commons.length || rares.length)){
+    const wantRare = Math.random() < .3;
+    if (!(wantRare ? take(rares) : take(commons))) take(wantRare ? commons : rares);
+  }
+  let rareCnt = picks.filter(r=>r.r==="r").length;
+  while (rareCnt < minRare && rares.length){
+    const rep = rares.splice(Math.floor(Math.random()*rares.length),1)[0];
+    const ci = picks.findIndex(r=>r.r!=="r");
+    if (ci < 0){ if (picks.length < n) picks.push(rep); else break; }
+    else picks[ci] = rep;
+    rareCnt++;
+  }
+  return picks;
+}
+function grantRelic(minRare){
+  const picks = drawRelicPool(1, minRare);
+  if (!picks.length) return null;
+  const r = picks[0];
+  meta.relics.push(r.id);
+  sysLog(`获得遗物「${r.name}」`);
+  return r;
+}
+function bloodOffer(prefix){
+  const r = grantRelic(Math.random()<.6 ? 1 : 0);
+  saveGame();
+  return r ? `${prefix}祭坛中央浮现馈赠——获得遗物「${r.name}」！` : `${prefix}但回廊的馈赠已尽数给出（遗物已集齐），凹槽中留下 <span class='soul'>+20</span> 魂作为补偿。${meta.souls+=20,""}`;
+}
 const defRed = d => 1 - d/(d+100);
 function saveGame(){ try{ localStorage.setItem(RUN_KEY, JSON.stringify(meta)); }catch(e){} }
 function loadGame(){ try{ return JSON.parse(localStorage.getItem(RUN_KEY)); }catch(e){ return null; } }
@@ -1206,7 +1325,8 @@ function drawBar(x, y, w, ratio, color, label){
 }
 function intentText(){
   const it = E.intent; if (!it) return "";
-  if (it.type === "atk") return `⚔ ${it.name} ~${Math.round(E.atk*it.mult*(E.affix==="fury"?1.3:1))}`;
+  if (E.debuffs.frozen > 0) return "❄ 被冰冻（跳过行动）";
+  if (it.type === "atk") return `⚔ ${it.name} ~${Math.round(E.atk*it.mult*(E.affixList&&E.affixList.includes("fury")?1.3:1))}`;
   if (it.type === "charge") return "✦ 正在蓄力…";
   if (it.type === "defend") return "🛡 防御姿态";
   if (it.type === "debuff") return `☠ ${it.name}`;
@@ -1224,6 +1344,8 @@ function drawHUD(){
   if (S.p.debuffs.burn>0) pl += `灼烧${S.p.debuffs.burn} `;
   if (S.p.debuffs.breakd>0) pl += `破防${S.p.debuffs.breakd} `;
   if (S.p.debuffs.vuln>0) pl += `易伤${S.p.debuffs.vuln} `;
+  if (S.p.debuffs.poison>0) pl += `中毒${S.p.debuffs.poison} `;
+  if (S.p.debuffs.frozen>0) pl += `❄冰冻 `;
   if (pl){ cx.font = "bold 9px Microsoft YaHei"; cx.fillStyle = "#ff7a4a"; cx.fillText(pl, px, 138); }
   drawBar(ex, 128, 165, De.hp/E.maxhp, "#e04a4a", `${E.name}  ${Math.ceil(De.hp)}/${E.maxhp}`);
   drawBar(ex, 146, 165, De.poise/E.maxpoise, "#d9a441", `韧性 ${Math.ceil(De.poise)}${E.poise===0?"  → 可处决":""}`);
@@ -1232,7 +1354,9 @@ function drawHUD(){
   if (E.debuffs.burn>0) db += `灼烧${E.debuffs.burn} `;
   if (E.debuffs.breakd>0) db += `破防${E.debuffs.breakd} `;
   if (E.debuffs.vuln>0) db += `易伤${E.debuffs.vuln} `;
-  if (E.affix) db += `[${E.affix}] `;
+  if (E.debuffs.poison>0) db += `中毒${E.debuffs.poison} `;
+  if (E.debuffs.frozen>0) db += `❄冰冻 `;
+  if (E.affixName) db += `[${E.affixName}] `;
   if (db){ cx.font = "bold 9px Microsoft YaHei"; cx.fillStyle = "#ff7a4a"; cx.fillText(db, ex, 108); }
   cx.font = "bold 10px Microsoft YaHei";
   cx.fillStyle = E.phase>=3 ? "#ff9c9c" : E.phase===2 ? "#ffd76e" : "#a8b3ff";
@@ -1422,10 +1546,13 @@ function tickQueue(dt){
 /* ==================== 战斗流程 ==================== */
 function startFloor(){
   hideOverlay();
-  spawnEnemy(floorKey(meta.floor));
+  const eliteCnt = meta.room==="elite" ? (meta.floor>=5 ? 2 : 1) : 0;
+  spawnEnemy(floorKey(meta.floor), eliteCnt);
   AudioSys.battle(meta.floor);
+  const pendP = meta.pendingDeb.poison||0, pendB = meta.pendingDeb.burn||0;
+  meta.pendingDeb = { poison:0, burn:0 };
   S = { frame:0, turn:0, over:false, log:[],
-        p:{ hp:playerMaxHp(), st:playerMaxSt(), guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0} },
+        p:{ hp:Math.min(meta.hp==null?playerMaxHp():meta.hp, playerMaxHp()), st:playerMaxSt(), guard:false, dodgeBuff:false, debuffs:{burn:pendB,breakd:0,vuln:0,poison:pendP,frozen:0} },
         stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
   Dp.hp = S.p.hp; Dp.st = S.p.st; De.hp = E.hp; De.poise = E.poise; De.shd = E.shield;
   V.p = { ox:0, oy:0, flash:0, ghost:0, block:0, visible:1, kb:0, z:0, zs:1, rot:0, sq:1,
@@ -1437,10 +1564,11 @@ function startFloor(){
   document.getElementById("log").innerHTML = "";
   sysLog(`—— 第 ${meta.floor} 层 · ${E.name}【${E.desc}】挡在回廊深处 ——`);
   if (E.affix) sysLog(`⚠ 精英词缀：${E.affixName}`);
+  if (pendP || pendB) sysLog(`⚠ 异象余波：${pendP?`中毒 ${pendP} 层 `:""}${pendB?`灼烧 ${pendB} 层`:""}`);
   rollIntent();
   renderUI();
 }
-function spawnEnemy(key){
+function spawnEnemy(key, eliteCnt){
   const t = ENEMIES[key], f = meta.floor;
   let sHp, sAtk;
   if (f <= 10){ sHp = 1 + .108*(f-1); sAtk = 1 + .078*(f-1); }
@@ -1449,12 +1577,18 @@ function spawnEnemy(key){
     maxhp:Math.round(t.hp*sHp), atk:+(t.atk*sAtk).toFixed(1), def:t.def,
     maxpoise:Math.round(t.poise*(1+.06*(Math.min(f,10)-1))),
     phase:1, stunned:0, shield:0, maxshield:t.shield?Math.round(t.hp*sHp*t.shield):0,
-    chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0}, intent:null, guarding:false,
+    chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0,poison:0,frozen:0}, intent:null, guarding:false,
     lifesteal:t.lifesteal||0, blink:t.blink||0, thorns:t.thorns||0, swift:!!t.swift, debuffOnHit:!!t.debuffOnHit,
-    affix:null, affixName:"" };
-  if (f > 10){
-    const aff = AFFIXES[Math.floor(Math.random()*AFFIXES.length)];
-    E.affix = aff.id; E.affixName = aff.name;
+    affix:null, affixName:"", affixList:[] };
+  // 词缀：无尽层保底 1 个；精英房按 eliteCnt 追加（不重复）
+  const nAff = Math.max(eliteCnt||0, f>10 ? 1 : 0);
+  for (let i=0;i<nAff;i++){
+    const cand = AFFIXES.filter(a=>!E.affixList.includes(a.id));
+    if (!cand.length) break;
+    const aff = cand[Math.floor(Math.random()*cand.length)];
+    E.affixList.push(aff.id);
+    E.affix = aff.id;
+    E.affixName = E.affixName ? E.affixName+"·"+aff.name : aff.name;
     if (aff.id === "fury") E.atk = +(E.atk*1.3).toFixed(1);
     if (aff.id === "thorn") E.thorns = Math.max(E.thorns, .25);
     if (aff.id === "swift") E.swift = true;
@@ -1473,7 +1607,7 @@ const playerDmg = (mult, targetDef, crit, critMult, elem) => {
   if (E.guarding) d *= 0.5;
   return Math.max(1, Math.round(d));
 };
-const enemyDmg = mult => Math.max(1, Math.round(E.atk*mult*(E.affix==="fury"?1.3:1)*(0.9+Math.random()*0.2)));
+const enemyDmg = mult => Math.max(1, Math.round(E.atk*mult*(E.affixList&&E.affixList.includes("fury")?1.3:1)*(0.9+Math.random()*0.2)));
 
 /* ==================== 意图系统 ==================== */
 function rollIntent(){
@@ -1555,6 +1689,13 @@ function playerAct(kind){
   p.st = Math.min(playerMaxSt(), p.st + (hasRelic("will")?16:10));
   p.guard = false;
   const h = `<span class="frm">[第${meta.floor}层 T${S.turn} F${S.frame}]</span> `;
+
+  if (p.debuffs.frozen > 0){
+    p.debuffs.frozen--;
+    addLog(`${h}❄ 玩家被<b>冰冻</b>，本回合无法行动`);
+    runSeq([{ dur:400, start:()=>{ V.p.flash = .5; burst(P_BASE.x, P_BASE.y-70, 10, "#7ab8ff", 1.6, 0.8); }, update:()=>{} }], () => enemyPhase());
+    return;
+  }
 
   if (kind === "guard"){
     p.guard = true; p.st = Math.min(playerMaxSt(), p.st+15);
@@ -1844,6 +1985,8 @@ function hitEnemy(d, crit, mv, shTxt, elemTxt, poiseMul){
     p.hp = Math.min(playerMaxHp(), p.hp+hl); }
   if (mv.elem === "fire" && E.debuffs.burn < DEBUFFS.burn.max){ E.debuffs.burn++; sysLog(`灼烧叠加（${E.debuffs.burn}层）`); }
   if (mv.elem === "thunder" && E.debuffs.breakd < DEBUFFS.breakd.max){ E.debuffs.breakd++; sysLog(`破防叠加（${E.debuffs.breakd}层）`); }
+  if (hasRelic("venomfang") && mv.elem === "fire" && Math.random() < .4 && E.debuffs.poison < poisonMax()){ E.debuffs.poison++; sysLog(`淬毒牙刃：中毒叠加（${E.debuffs.poison}层）`); }
+  if (hasRelic("frostsigil") && mv.elem === "thunder" && Math.random() < .3 && E.debuffs.frozen < 1){ E.debuffs.frozen = 1; sysLog("❄ 冰寒印记：敌人下回合被冻结"); }
   if (E.poise === 0){ sysLog("⚠ 敌人韧性破！倒地 1 回合，出现处决窗口"); E.stunned = 1; }
   const tag = crit ? "crit" : "dmg";
   floatText(E_BASE.x+V.e.ox-20, E_BASE.y-150, `${d}`, crit?"#ffd76e":"#ff8a8a", crit?28:21, { big:crit });
@@ -2058,6 +2201,12 @@ function enemyPhase(){
   if (S.over) return;
   resetDepth();
   const evs = [];
+  if (E.debuffs.frozen > 0){
+    E.debuffs.frozen--; sysLog("❄ 敌人被冰冻，跳过行动");
+    E.guarding = false;
+    runSeq([{ dur:300, start:()=>{ V.e.flash = .5; }, update:()=>{} }], () => endRound());
+    return;
+  }
   if (E.stunned > 0){
     E.stunned--; sysLog("敌人倒地中，跳过行动");
     E.guarding = false;
@@ -2199,6 +2348,10 @@ function enemyHit(mult, name, ranged, drain, keepDodge){
       if (p.debuffs.vuln < DEBUFFS.vuln.max) p.debuffs.vuln++;
       note += " · <span class='dmg'>碎甲</span>（易伤+1）";
     }
+    if (E.affixList && E.affixList.includes("frost") && p.debuffs.frozen < 1 && Math.random() < .25){
+      p.debuffs.frozen = 1;
+      note += " · <span style='color:#7ab8ff'>冰寒冻结</span>（玩家下回合无法行动）";
+    }
   }
   // 多段连段的后续命中不消耗闪避：一次闪避应规避整套连段
   if (!keepDodge) p.dodgeBuff = false;
@@ -2208,9 +2361,18 @@ function enemyHit(mult, name, ranged, drain, keepDodge){
 }
 function endRound(){
   if (S.over) return;
-  // 回合末结算：灼烧 / 再生 / 防御重置
+  // 回合末结算：背水一战 / 灼烧 / 中毒 / 毒疫 / 再生 / 防御重置
+  if (hasRelic("secondwind") && S.p.hp > 0 && S.p.hp < playerMaxHp()*.3){
+    S.p.hp = Math.min(playerMaxHp(), S.p.hp+8); sysLog("背水一战：生命 <span class='heal'>+8</span>");
+  }
   if (S.p.debuffs.burn > 0){ S.p.hp = Math.max(0, S.p.hp - DEBUFFS.burn.dot); sysLog(`灼烧伤害 -${DEBUFFS.burn.dot} HP`); }
-  if (E.debuffs.burn > 0){ E.hp = Math.max(0, E.hp - DEBUFFS.burn.dot); sysLog(`敌方灼烧 -${DEBUFFS.burn.dot} HP`); }
+  if (S.p.debuffs.poison > 0){ S.p.hp = Math.max(0, S.p.hp - poisonDot()); sysLog(`中毒伤害 -${poisonDot()} HP`); }
+  if (E.affixList && E.affixList.includes("plague") && S.p.hp > 0 && S.p.debuffs.poison < poisonMax()){
+    S.p.debuffs.poison++; sysLog("⚠ 毒疫：玩家 中毒 +1 层");
+  }
+  const wh = hasRelic("warmheart") ? 1.5 : 1;
+  if (E.debuffs.burn > 0){ const bd = Math.round(DEBUFFS.burn.dot*wh); E.hp = Math.max(0, E.hp - bd); sysLog(`敌方灼烧 -${bd} HP`); }
+  if (E.debuffs.poison > 0){ const pd = Math.round(poisonDot()*wh); E.hp = Math.max(0, E.hp - pd); sysLog(`敌方中毒 -${pd} HP`); }
   E.guarding = false;
   rollIntent();
   if (E.hp <= 0){ killEnemy(); return; }
@@ -2220,8 +2382,14 @@ function endRound(){
 function killEnemy(){
   S.over = true;
   meta.kills++;
-  const gain = FLOOR_SOULS(meta.floor);
+  const gain = Math.round(FLOOR_SOULS(meta.floor) * (meta.room==="elite" ? 1.5 : 1));
   meta.souls += gain;
+  if (hasRelic("tide")){
+    const hl = Math.round(playerMaxHp()*.15);
+    S.p.hp = Math.min(playerMaxHp(), S.p.hp+hl);
+    sysLog(`血潮之约：击杀回复 <span class='heal'>+${hl}</span> HP`);
+  }
+  meta.hp = S.p.hp;
   saveGame();
   sysLog(`${E.name} 被击败！获得回廊之魂 +${gain}`);
   flushLog();
@@ -2276,6 +2444,7 @@ function killEnemy(){
 }
 function playerDie(){
   S.over = true;
+  meta.hp = null; meta.pendingDeb = { poison:0, burn:0 };   // 倒下后重整：生命回满、异象清除
   sysLog("玩家倒下……回廊记得每一次倒下");
   flushLog();
   runSeq([
@@ -2447,32 +2616,49 @@ function startTitleScene(){
   titleRAF = requestAnimationFrame(render);
 }
 function newRun(){
-  meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0, combo:0, stance:"neutral" };
+  meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0, combo:0, stance:"neutral",
+           room:null, stage:0, lastRooms:[], eventSeen:[], pendingDeb:{poison:0,burn:0}, hp:null };
   saveGame(); startFloor();
 }
 function continueRun(){
   const m = loadGame();
-  if (m && m.floor){ meta = m; startFloor(); } else newRun();
+  if (m && m.floor){
+    // v6 存档兼容：合并新字段默认值
+    m.room = m.room ?? null; m.stage = m.stage ?? 0;
+    m.lastRooms = m.lastRooms || []; m.eventSeen = m.eventSeen || [];
+    m.pendingDeb = m.pendingDeb || { poison:0, burn:0 };
+    if (m.hp == null) m.hp = null;
+    meta = m;
+    if (meta.stage === 2 && meta.room){        // 中断在房间内：重开对应弹层（事件重抽可接受）
+      if (meta.room === "event") showEvent();
+      else if (meta.room === "shop") showShop();
+      else if (meta.room === "bonfire") showBonfire();
+      else startFloor();
+      return;
+    }
+    if (meta.stage === 1){ showLevelUp(); return; }
+    startFloor();
+  } else newRun();
 }
 function showVictory(gain){
   AudioSys.jingle("victory");
-  const pool = RELICS.filter(r => !hasRelic(r.id));
-  const picks = [];
-  while (picks.length < 3 && pool.length) picks.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+  const elite = meta.room === "elite";
+  const picks = drawRelicPool(3, elite ? 2 : 0);
   window._picks = picks;
   const endless = meta.floor >= 10;
   showOverlay(`
     <h3 class="win">${endless?"回廊之心 已被击败！":"第 "+meta.floor+" 层 · 通关"}</h3>
-    <div class="sub">${endless?"回廊开始无限延伸——精英词缀将越来越常见":"获得回廊之魂 <span class='soul'>+"+gain+"</span>（当前 <span class='soul'>"+meta.souls+"</span>）"}</div>
+    <div class="sub">${endless?"回廊开始无限延伸——精英词缀将越来越常见":"获得回廊之魂 <span class='soul'>+"+gain+"</span>（当前 <span class='soul'>"+meta.souls+"</span>）"}${elite?" · <span style='color:#ffd76e'>精英猎杀</span>":""}</div>
     <div class="choices">
-      ${picks.map((r,i)=>`<div class="choice" onclick="pickRelic(${i})">${iconSvg(r.id,"gold")}<div class="cn">${r.name}</div><div class="cd">${r.desc}</div></div>`).join("")}
+      ${picks.length ? picks.map((r,i)=>`<div class="choice" onclick="pickRelic(${i})">${iconSvg(r.id,"gold")}<div class="cn">${r.name}${r.r==="r"?" <span style='color:#c792ea;font-size:10px'>稀有</span>":""}</div><div class="cd">${r.desc}</div></div>`).join("") : `<div class="sub">遗物已集齐，回廊再无馈赠。</div>`}
     </div>
-    <button class="ovbtn gray" onclick="pickRelic(-1)">放弃遗物（+5 魂）</button>
+    ${picks.length?`<button class="ovbtn gray" onclick="pickRelic(-1)">放弃遗物（+5 魂）</button>`:`<button class="ovbtn" onclick="pickRelic(-2)">继续</button>`}
   `, "victory");
 }
 function pickRelic(i){
-  if (i >= 0){ meta.relics.push(window._picks[i].id); sysLog(`获得遗物「${window._picks[i].name}」`); }
-  else { meta.souls += 5; sysLog("放弃遗物，魂 +5"); }
+  if (i >= 0 && window._picks && window._picks.length){ meta.relics.push(window._picks[i].id); sysLog(`获得遗物「${window._picks[i].name}」`); }
+  else if (i === -1){ meta.souls += 5; sysLog("放弃遗物，魂 +5"); }
+  meta.room = null; meta.stage = 1;
   meta.floor++; saveGame(); showLevelUp();
 }
 const upCost = k => UP_INFO[k].base + (meta.up[k]||0)*UP_INFO[k].step;
@@ -2489,16 +2675,182 @@ function showLevelUp(){
           <div class="ue">当前 ${cur}</div></div>`;
       }).join("")}
     </div>
-    <button class="ovbtn" onclick="hideOverlay();startFloor()">深入第 ${meta.floor} 层</button>
+    <button class="ovbtn" onclick="hideOverlay();nextStep()">${meta.floor===5||meta.floor===10?"直面层主 · 深入第 "+meta.floor+" 层":"深入第 "+meta.floor+" 层"}</button>
   `);
 }
 function buyUpgrade(k){
   const u = UP_INFO[k], cost = upCost(k);
   if (meta.souls < cost || (u.max && meta.up[k] >= u.max)) return;
   meta.souls -= cost; meta.up[k]++;
-  if (k==="hp" && S) S.p.hp += 20;
+  if (k==="hp" && S){ S.p.hp += 20; meta.hp = Math.min(playerMaxHp(), (meta.hp==null?playerMaxHp():meta.hp)+20); }
   if (k==="st" && S) S.p.st += 15;
   saveGame(); sysLog(`强化完成：${u.label}`); showLevelUp();
+}
+/* ==================== v6 路线房间系统 ==================== */
+function nextStep(){
+  if (meta.floor === 5 || meta.floor === 10) startFloor();   // 层主固定，不做路线选择
+  else showRoute();
+}
+function rollRoute(){
+  const pool = [ ["combat",40], ["event",20], ["shop",15], ["bonfire",15] ];
+  if (meta.floor >= 3) pool.push(["elite",20]);
+  const last = meta.lastRooms[meta.lastRooms.length-1];
+  const avail = pool.filter(([k]) => k !== last);
+  const n = meta.floor <= 3 ? 2 : (Math.random() < .5 ? 2 : 3);
+  const cards = [];
+  while (cards.length < n && avail.length){
+    const total = avail.reduce((s,[,w])=>s+w,0);
+    let r = Math.random()*total, idx = 0;
+    for (let i=0;i<avail.length;i++){ r -= avail[i][1]; if (r<=0){ idx=i; break; } }
+    cards.push(avail[idx][0]); avail.splice(idx,1);
+  }
+  if (!cards.includes("combat")) cards[Math.floor(Math.random()*cards.length)] = "combat"; // 保底战斗
+  return cards;
+}
+function showRoute(){
+  const cards = rollRoute();
+  window._route = cards;
+  showOverlay(`
+    <h3>选择前进路线</h3>
+    <div class="sub">第 ${meta.floor} 层 · 回廊在你面前分岔</div>
+    <div class="choices">
+      ${cards.map((k,i)=>`<div class="choice" onclick="pickRoute(${i})">${iconSvg(ROOM_META[k].ico,"gold")}<div class="cn">${ROOM_META[k].name}</div><div class="cd">${ROOM_META[k].desc}</div></div>`).join("")}
+    </div>
+  `, "route");
+}
+function pickRoute(i){
+  const k = window._route[i];
+  meta.room = k; meta.stage = 2;
+  meta.lastRooms.push(k);
+  if (meta.lastRooms.length > 4) meta.lastRooms.shift();
+  saveGame();
+  if (k==="combat" || k==="elite") startFloor();
+  else if (k==="event") showEvent();
+  else if (k==="shop") showShop();
+  else showBonfire();
+}
+function finishRoom(){   // 非战斗房结算：推进层，回到整备
+  meta.room = null; meta.stage = 1;
+  meta.floor++; saveGame(); showLevelUp();
+}
+/* ==================== v6 事件 / 商店 / 篝火 ==================== */
+let curEvent = null;
+function showEvent(){
+  let pool = EVENTS.filter(e => !meta.eventSeen.includes(e.id));
+  if (!pool.length){ meta.eventSeen = []; pool = EVENTS; }
+  const ev = pool[Math.floor(Math.random()*pool.length)];
+  meta.eventSeen.push(ev.id);
+  curEvent = ev; saveGame();
+  showOverlay(`
+    <h3>${ev.name}</h3>
+    <div class="sub" style="text-align:left;line-height:1.9">${ev.text}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin:14px 0 4px">
+      ${ev.opts.map((o,i)=>`<button class="ovbtn" ${o.can && !o.can() ? "disabled style='opacity:.35'" : ""} onclick="pickEventOpt(${i})">${o.label}</button>`).join("")}
+    </div>
+  `, "event");
+}
+function pickEventOpt(i){
+  const msg = curEvent.opts[i].act();
+  saveGame(); flushLog(); renderUI();
+  showOverlay(`
+    <h3>${curEvent.name} · 了结</h3>
+    <div class="sub" style="line-height:2">${msg}</div>
+    <button class="ovbtn" onclick="hideOverlay();finishRoom()">继续深入</button>
+  `, "event");
+}
+/* —— 流亡商人 —— */
+const shopPrice = n => Math.max(1, Math.round(n * (hasRelic("gildscale") ? .75 : 1)));
+let shopStock = null;
+function showShop(){
+  if (!shopStock || shopStock.floor !== meta.floor){
+    const commons = RELICS.filter(r=>!meta.relics.includes(r.id) && (r.r||"c")==="c");
+    const rares   = RELICS.filter(r=>!meta.relics.includes(r.id) && r.r==="r");
+    const pick = arr => arr.length ? arr.splice(Math.floor(Math.random()*arr.length),1)[0] : null;
+    const rl = [pick(commons), pick(commons), pick(rares)].filter(Boolean);
+    shopStock = { floor: meta.floor, relics: rl.map(r=>({ id:r.id, sold:false })), potSold:0 };
+  }
+  renderShop();
+}
+function renderShop(){
+  const s = shopStock;
+  const relicCards = s.relics.map((it,i)=>{
+    if (it.sold) return `<div class="choice" style="opacity:.3"><div class="cn">已售出</div></div>`;
+    const r = RELICS.find(x=>x.id===it.id);
+    const price = shopPrice(r.r==="r"?42:24);
+    return `<div class="choice" onclick="buyShopRelic(${i})" style="cursor:pointer">${iconSvg(r.id,"gold")}<div class="cn">${r.name}${r.r==="r"?" <span style='color:#c792ea;font-size:10px'>稀有</span>":""}</div><div class="cd">${r.desc}</div><div class="uc" style="margin-top:4px;color:${meta.souls>=price?"#ffd76e":"#e04a4a"}">${price} 魂</div></div>`;
+  }).join("");
+  const potPrice = shopPrice(16), healPrice = shopPrice(15);
+  showOverlay(`
+    <h3>流亡商人</h3>
+    <div class="sub">『回廊的魂，在我这儿什么都能换。』（持有 <span class='soul'>${meta.souls}</span> 魂${hasRelic("gildscale")?" · 镀金秤 75 折":""}）</div>
+    <div class="choices">${relicCards}</div>
+    <div class="choices" style="margin-top:10px">
+      <div class="choice" onclick="buyShopPotion()" style="cursor:pointer;${s.potSold>=2?"opacity:.3;pointer-events:none":""}">${iconSvg("pot","green")}<div class="cn">药剂</div><div class="cd">恢复 35 HP（剩 ${2-s.potSold} 瓶）</div><div class="uc" style="margin-top:4px;color:${meta.souls>=potPrice?"#ffd76e":"#e04a4a"}">${potPrice} 魂</div></div>
+      <div class="choice" onclick="buyShopHeal()" style="cursor:pointer">${iconSvg("hp","green")}<div class="cn">治疗</div><div class="cd">回复 30% 最大生命（+${Math.round(playerMaxHp()*.3)}）</div><div class="uc" style="margin-top:4px;color:${meta.souls>=healPrice?"#ffd76e":"#e04a4a"}">${healPrice} 魂</div></div>
+    </div>
+    <button class="ovbtn" onclick="hideOverlay();finishRoom()">离开 · 继续深入</button>
+  `, "shop");
+}
+function buyShopRelic(i){
+  const it = shopStock.relics[i];
+  if (!it || it.sold) return;
+  const r = RELICS.find(x=>x.id===it.id);
+  const price = shopPrice(r.r==="r"?42:24);
+  if (meta.souls < price) return;
+  meta.souls -= price; it.sold = true;
+  meta.relics.push(r.id);
+  sysLog(`购得遗物「${r.name}」（-${price} 魂）`);
+  saveGame(); renderShop();
+}
+function buyShopPotion(){
+  if (shopStock.potSold >= 2) return;
+  const price = shopPrice(16);
+  if (meta.souls < price) return;
+  meta.souls -= price; shopStock.potSold++; meta.potions++;
+  sysLog(`购得药剂（-${price} 魂）`);
+  saveGame(); renderShop();
+}
+function buyShopHeal(){
+  const price = shopPrice(15);
+  if (meta.souls < price) return;
+  meta.souls -= price;
+  addHp(Math.round(playerMaxHp()*.3));
+  sysLog(`商人治疗：生命回复 30%（-${price} 魂）`);
+  saveGame(); renderShop();
+}
+/* —— 回廊篝火 —— */
+function showBonfire(){
+  const healN = Math.round(playerMaxHp()*(hasRelic("longember")?.6:.4));
+  showOverlay(`
+    <h3>回廊篝火</h3>
+    <div class="sub">微弱的火光驱散回廊的寒意。短暂休整——但火光也会引来注视。${hasRelic("longember")?"<span style='color:#ffd76e'>（长明火种：回血量提升）</span>":""}</div>
+    <div class="choices">
+      <div class="choice" onclick="bonfireHeal()">${iconSvg("hp","green")}<div class="cn">休憩</div><div class="cd">回复 ${healN} 生命（当前 ${meta.hp==null?playerMaxHp():Math.round(meta.hp)}/${playerMaxHp()}）</div></div>
+      <div class="choice" onclick="bonfirePotion()">${iconSvg("pot","green")}<div class="cn">调配药剂</div><div class="cd">药剂 +1（当前 ${meta.potions}）</div></div>
+      <div class="choice" onclick="bonfireSouls()">${iconSvg("st","green")}<div class="cn">静坐凝神</div><div class="cd">回廊之魂 +15</div></div>
+    </div>
+  `, "bonfire");
+}
+function bonfireDone(msg){
+  saveGame(); flushLog(); renderUI();
+  showOverlay(`
+    <h3>回廊篝火 · 休整完毕</h3>
+    <div class="sub" style="line-height:2">${msg}</div>
+    <button class="ovbtn" onclick="hideOverlay();finishRoom()">熄灭火堆 · 继续深入</button>
+  `, "bonfire");
+}
+function bonfireHeal(){
+  const n = Math.round(playerMaxHp()*(hasRelic("longember")?.6:.4));
+  addHp(n);
+  bonfireDone(`篝火的暖意渗入伤口，生命 <span class="heal">+${n}</span>。火光渐弱，你重新背起行囊。`);
+}
+function bonfirePotion(){
+  meta.potions++;
+  bonfireDone("你用篝火熬煮草药，调配出一瓶新的药剂（<b>药剂 +1</b>）。");
+}
+function bonfireSouls(){
+  meta.souls += 15;
+  bonfireDone("凝神静气间，散落在火堆旁的魂晶向你聚来（<span class='soul'>+15</span> 魂）。");
 }
 function showDeath(){
   AudioSys.jingle("defeat");
@@ -2509,7 +2861,7 @@ function showDeath(){
     <button class="ovbtn gray" onclick="showMenu()">返回大厅</button>
   `, "defeat");
 }
-function retryFloor(){ saveGame(); startFloor(); }
+function retryFloor(){ meta.hp = null; meta.pendingDeb = { poison:0, burn:0 }; saveGame(); startFloor(); }
 
 /* ==================== DOM 面板 ==================== */
 function sysLog(t){ S.log.push(`<div class="sys">▸ ${t}</div>`); flushLog(); }
@@ -2538,6 +2890,8 @@ function renderUI(){
   if (S.p.debuffs.burn>0) pd.push(`灼烧${S.p.debuffs.burn}`);
   if (S.p.debuffs.breakd>0) pd.push(`破防${S.p.debuffs.breakd}`);
   if (S.p.debuffs.vuln>0) pd.push(`易伤${S.p.debuffs.vuln}`);
+  if (S.p.debuffs.poison>0) pd.push(`中毒${S.p.debuffs.poison}`);
+  if (S.p.debuffs.frozen>0) pd.push(`❄冰冻`);
   document.getElementById("bl-pdeb").textContent = pd.length ? pd.join(" ") : "无";
   document.getElementById("bl-pot").textContent = meta.potions;
   document.getElementById("stance-cost").textContent = STANCES[meta.stance].name;
@@ -2550,13 +2904,14 @@ function renderUI(){
 }
 
 /* ==================== 启动 ==================== */
-meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0, combo:0, stance:"neutral" };
+meta = { floor:1, souls:0, up:{atk:0,hp:0,st:0,pot:0}, relics:[], potions:2, kills:0, combo:0, stance:"neutral",
+         room:null, stage:0, lastRooms:[], eventSeen:[], pendingDeb:{poison:0,burn:0}, hp:null };
 S = { frame:0, turn:0, over:true, log:[],
-      p:{ hp:110, st:100, guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0} },
+      p:{ hp:110, st:100, guard:false, dodgeBuff:false, debuffs:{burn:0,breakd:0,vuln:0,poison:0,frozen:0} },
       stats:{ swings:0, hits:0, crits:0, execs:0, dmg:0 } };
 E = { type:"guard", name:"-", desc:"", maxhp:1, hp:1, poise:1, maxpoise:1, atk:0, def:0, phase:1, stunned:0,
-      shield:0, maxshield:0, chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0}, intent:null, guarding:false,
-      lifesteal:0, blink:0, thorns:0, swift:false, debuffOnHit:false, affix:null, affixName:"" };
+      shield:0, maxshield:0, chargeNext:false, debuffs:{burn:0,breakd:0,vuln:0,poison:0,frozen:0}, intent:null, guarding:false,
+      lifesteal:0, blink:0, thorns:0, swift:false, debuffOnHit:false, affix:null, affixName:"", affixList:[] };
 /* ==================== 程序化音乐系统（WebAudio 合成 · 无外部音频资源） ==================== */
 const AudioSys = (()=>{
   let actx=null, masterG=null, musicBus=null, sfxBus=null, timer=0;
