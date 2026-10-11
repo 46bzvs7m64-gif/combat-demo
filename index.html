@@ -1526,7 +1526,7 @@ function playerAct(kind){
   if (kind === "guard"){
     p.guard = true; p.st = Math.min(playerMaxSt(), p.st+15);
     addLog(`${h}玩家 <b>格挡</b>，体力 <span class="heal">+15</span>，减伤 70%${hasRelic("thorn")?" · 荆棘待发":""}`);
-    runSeq([{ dur:260, update:t=>{ V.p.block = t; V.p.sq = 1-0.09*Math.sin(t*Math.PI); V.p.z = 5*Math.sin(t*Math.PI);
+    runSeq([{ dur:260, start:()=>{ AudioSys.sfx("guardUp"); }, update:t=>{ V.p.block = t; V.p.sq = 1-0.09*Math.sin(t*Math.PI); V.p.z = 5*Math.sin(t*Math.PI);
                V.p.ba = -0.55*Math.sin(t*Math.PI/2); V.p.cr = 5*Math.sin(t*Math.PI/2); }, end:()=>{ V.p.block = 0.9; V.p.sq=1; V.p.z=0; } }], () => enemyPhase());
     return;
   }
@@ -1535,7 +1535,7 @@ function playerAct(kind){
     p.st -= 20; p.dodgeBuff = true;
     addLog(`${h}玩家 <b>闪避</b>，规避本回合伤害，下次轻击必暴击`);
     runSeq([
-      { dur:200, update:t=>{ V.p.ghost = t; V.p.ox = -46*t; V.p.rot = -0.18*t; V.p.sq = 1-0.12*t; V.p.zs = 1-0.06*t;
+      { dur:200, start:()=>{ AudioSys.sfx("dodge"); }, update:t=>{ V.p.ghost = t; V.p.ox = -46*t; V.p.rot = -0.18*t; V.p.sq = 1-0.12*t; V.p.zs = 1-0.06*t;
           V.p.cr = 10*t; V.p.ln = -0.14*t; V.p.lf = -12*t; V.p.lbl = 8*t; V.p.ba = .4*t; } },
       { dur:260, update:t=>{ V.p.ghost = 1-t; V.p.ox = -46*(1-t); V.p.rot = -0.18*(1-t); V.p.sq = 1-0.12*(1-t); V.p.zs = 1-0.06*(1-t);
           V.p.cr = 10*(1-t); V.p.ln = -0.14*(1-t); V.p.lf = -12*(1-t); V.p.lbl = 8*(1-t); V.p.ba = .4*(1-t); } },
@@ -1547,7 +1547,7 @@ function playerAct(kind){
     const heal = hasRelic("pouch")?45:35;
     p.hp = Math.min(playerMaxHp(), p.hp+heal);
     addLog(`${h}玩家使用药剂 <span class="heal">+${heal} HP</span>（剩 ${meta.potions}）`);
-    runSeq([{ dur:420, start:()=>{ burst(P_BASE.x, P_BASE.y-70, 14, "#7fd8a0", 1.6, 1.4);
+    runSeq([{ dur:420, start:()=>{ AudioSys.sfx("potion"); burst(P_BASE.x, P_BASE.y-70, 14, "#7fd8a0", 1.6, 1.4);
                floatText(P_BASE.x, P_BASE.y-130, `+${heal}`, "#7fd8a0", 20);
                ringFx(P_BASE.x, P_BASE.y-60, "rgba(127,216,160,.6)"); },
              update:t=>{ V.p.cr = 6*Math.sin(t*Math.PI); V.p.ba = -0.5*Math.sin(t*Math.PI); } }], () => enemyPhase());
@@ -1567,7 +1567,7 @@ function playerAct(kind){
         color:i%2?"#c792ea":"#8a5cc8", r:1.5+Math.random()*2 }); } };
     runSeq([
       // 一段：凝滞蓄势 —— 压暗、蹲身、暗能聚拢、敌人倒伏下沉
-      { dur:280, start:()=>{ V.e.sq = .88; V.e.z = -6; },
+      { dur:280, start:()=>{ AudioSys.sfx("execCharge"); V.e.sq = .88; V.e.z = -6; },
         update:t=>{
           V.p.ox = -8*t; V.p.sq = 1-.18*t; V.p.zs = 1+.06*t; V.p.rot = .1*t; V.p.z = 0;
           V.p.sw = -.55*t; V.p.ba = -.35*t; V.p.cr = 7*t; V.p.ln = -.1*t;
@@ -1576,7 +1576,7 @@ function playerAct(kind){
           if (Math.random()<.35) converge();
         } },
       // 二段：暗影瞬步穿身 —— 先疾冲逼近，穿越敌人身位的瞬间才结算（定格落在命中帧）
-      { dur:230, update:t=>{
+      { dur:230, start:()=>{ AudioSys.sfx("execDash"); }, update:t=>{
           if (t < CROSS){
             const u = t/CROSS, ease = u*u*(3-2*u); // smoothstep：起步快、命中前略收
             V.p.ox = -8 + (OVER+8)*.55*ease;
@@ -1588,6 +1588,7 @@ function playerAct(kind){
             if (Math.random()<.7) afterimages.push({who:'p',ox:V.p.ox,life:1});
           } else {
             if (!hitF.done){ hitF.done = true;
+              AudioSys.sfx("execHit");
               S.frame += 4; S.stats.execs++;
               E.hp = Math.max(0, E.hp - d); S.stats.dmg += d;
               floatText(E_BASE.x-10, E_BASE.y-160, `${d}!`, "#c792ea", 36, { big:true });
@@ -1641,7 +1642,7 @@ function playerAct(kind){
     const L = E_BASE.x-P_BASE.x-60, hit = {};
     runSeq([
       // 蓄力蹲身（双手举剑过头，屈膝下沉）
-      { dur:240, start:()=>{ V.fullflash = .35; }, update:t=>{
+      { dur:240, start:()=>{ AudioSys.sfx("finCharge"); V.fullflash = .35; }, update:t=>{
           V.p.ox = -14*t; V.p.sq = 1-0.28*t; V.p.zs = 1+0.07*t; V.p.rot = 0.12*t; V.p.z = 0;
           V.p.sw = -1.05*t; V.p.ba = -0.75*t; V.p.ln = -0.18*t; V.p.cr = 14*t; V.p.lf = -6*t;
           if (Math.random()<.3) afterimages.push({who:'p',ox:V.p.ox,life:1});
@@ -1657,13 +1658,14 @@ function playerAct(kind){
           if (Math.random()<.4) afterimages.push({who:'p',ox:V.p.ox,life:1});
         } },
       // 下劈（空中引臂→全力劈落，落地瞬间结算）
-      { dur:180, update:t=>{
+      { dur:180, start:()=>{ AudioSys.sfx("finSwing"); }, update:t=>{
           V.p.ox = L*0.72 + L*0.28*t;
           V.p.z = 108*Math.cos(t*Math.PI/2);
           V.p.zs = 0.96 + 0.24*t; V.p.rot = -0.3 - 0.12*t;
           V.p.sw = -1.2+2.9*t; V.p.ba = -0.9+1.5*t; V.p.ln = -0.02+0.34*t;
           V.p.lfl = 12*(1-t); V.p.lbl = 10*(1-t);
           if (t >= .88 && !hit.done){ hit.done = true;
+            AudioSys.sfx("finHit");
             S.stats.dmg += d; E.hp = Math.max(0, E.hp-d);
             floatText(E_BASE.x-10, E_BASE.y-165, `${d}!!`, "#ffd76e", 38, { big:true });
             floatText(E_BASE.x-10, E_BASE.y-205, "终 结 技", "#fff2cc", 16, { big:true });
@@ -1710,7 +1712,7 @@ function playerAct(kind){
     addLog(`${h}玩家 <b>${mv.name}</b> → <span class="sys">${E.name} 闪现规避！</span>`);
     runSeq([
       { dur:140, update:t=>{ V.p.ox = 60*t; } },
-      { dur:220, start:()=>{ burst(E_BASE.x, E_BASE.y-70, 14, "#6a9cff", 2, 0.5); floatText(E_BASE.x-10, E_BASE.y-150, "MISS", "#8a93ad", 20); V.e.z = 58; V.e.zs = 1.12; V.e.sq = .75; },
+      { dur:220, start:()=>{ AudioSys.sfx("blink"); burst(E_BASE.x, E_BASE.y-70, 14, "#6a9cff", 2, 0.5); floatText(E_BASE.x-10, E_BASE.y-150, "MISS", "#8a93ad", 20); V.e.z = 58; V.e.zs = 1.12; V.e.sq = .75; },
         update:t=>{ V.e.ox = -70*Math.sin(t*Math.PI); V.e.z = 58*Math.cos(t*Math.PI/2); V.e.zs = 1.12-0.12*t; V.e.sq = .75+0.25*t; } },
       { dur:140, update:t=>{ V.p.ox = 60*(1-t); } },
     ], () => afterPlayerAttack(false));
@@ -1720,7 +1722,7 @@ function playerAct(kind){
   if (kind === "light"){
     // 双段斩（前冲倾身 + 第二段小跳反手），四肢协同：引臂→跨步挥砍→反手回削→收势
     runSeq([
-      { dur:160, update:t=>{ V.p.ox = 92*t*t; V.p.rot = 0.14*t; V.p.zs = 1+0.05*t; V.p.z = 6*Math.sin(t*Math.PI);
+      { dur:160, start:()=>{ AudioSys.sfx("swingL"); }, update:t=>{ V.p.ox = 92*t*t; V.p.rot = 0.14*t; V.p.zs = 1+0.05*t; V.p.z = 6*Math.sin(t*Math.PI);
           if (t<.42){ const u=t/.42; V.p.sw=-0.6*u; V.p.ln=-0.1*u; V.p.ba=.32*u; V.p.cr=4*u; V.p.lf=-6*u; }
           else { const u=(t-.42)/.58; V.p.sw=-0.6+1.95*u; V.p.ln=-0.1+0.28*u; V.p.ba=.32-.82*u;
                  V.p.cr=4*(1-u); V.p.lf=-6+8*u; V.p.lfl=7*Math.sin(u*Math.PI); }
@@ -1733,6 +1735,7 @@ function playerAct(kind){
         }, update:t=>{ V.slash.show = 1-t; V.e.flash = Math.max(0,1-t*2); V.p.rot = 0.14-0.18*t; V.p.zs = 1.05-0.02*t;
           V.p.sw = 1.35-0.42*t; V.p.ln = 0.18-0.08*t; V.p.ba = -.5+.2*t; V.p.lf = 2; } },
       { dur:130, start:()=>{
+          AudioSys.sfx("swingL2"); AudioSys.sfx("hitFireS");
           const d2 = Math.max(1, Math.round(d*0.35));
           E.hp = Math.max(0, E.hp - d2); S.stats.dmg += d2;
           floatText(E_BASE.x+V.e.ox-8, E_BASE.y-130, `${d2}`, "#ffb0a0", 16);
@@ -1747,9 +1750,9 @@ function playerAct(kind){
     // 重击·雷陨跳劈：双手举剑蓄力 → 屈膝跃起 → 空中引臂 → 劈落（四肢协同）
     const reach = 150;
     runSeq([
-      { dur:180, update:t=>{ V.p.ox = -12*t; V.p.sq = 1-0.22*t; V.p.zs = 1-0.04*t; V.p.rot = 0.12*t;
+      { dur:180, start:()=>{ AudioSys.sfx("chargeH"); }, update:t=>{ V.p.ox = -12*t; V.p.sq = 1-0.22*t; V.p.zs = 1-0.04*t; V.p.rot = 0.12*t;
           V.p.sw = -0.95*t; V.p.ba = -0.62*t; V.p.ln = -0.16*t; V.p.cr = 11*t; V.p.lf = -5*t; } },
-      { dur:300, update:t=>{
+      { dur:300, start:()=>{ AudioSys.sfx("swingH"); }, update:t=>{
           V.p.ox = -12*(1-t) + reach*0.55*t;
           V.p.z = 92*Math.sin(t*Math.PI/2);
           V.p.zs = 0.96+0.1*t; V.p.rot = 0.12-0.4*t; V.p.sq = 1;
@@ -1785,6 +1788,8 @@ function playerAct(kind){
 }
 function hitEnemy(d, crit, mv, shTxt, elemTxt, poiseMul){
   const p = S.p;
+  // 命中音效按攻击元素区分：火=干脆爆裂，雷=低频轰鸣+电裂；暴击追加高频金属泛音
+  AudioSys.sfx(mv.elem === "thunder" ? "hitThunder" : "hitFire", { crit });
   // 命中停顿：重击/暴击更长
   V.hitstop = crit ? 110 : (mv.name === "重击" ? 90 : 55);
   V.comboCount++; V.comboTimer = 1400;
@@ -1851,17 +1856,19 @@ const SLAM_HOP = { guard:30, berserker:74, butcher:42, lord:58, bloodfang:52, go
 /* 敌人攻击事件：把意图事件转成带伪3D姿态的动画 */
 function buildAtkEvent(e){
   const D = E_BASE.x - P_BASE.x - 80; // 冲刺距离（ox 负方向）
-  const strike = ()=>{ if (!e._hit){ e._hit = true; enemyHit(e.mult, e.name, !!e.ranged, e.drain, !!e.flurry); } };
+  const strike = ()=>{ if (!e._hit){ e._hit = true;
+      if (e.style === "submerge") AudioSys.sfx("eStrike");
+      enemyHit(e.mult, e.name, !!e.ranged, e.drain, !!e.flurry); } };
   const rest = ()=>{ V.e.ox=0; V.e.z=0; V.e.zs=1; V.e.rot=0; V.e.sq=1; V.e.ln=0; };
   if (e.style === "cast"){
-    return { dur:880, start:()=>{ V.e.telegraph = 1; },
+    return { dur:880, start:()=>{ AudioSys.sfx("eCast"); V.e.telegraph = 1; },
       update:t=>{
         if (t < .36){
           const u=t/.36;
           V.e.ox=-30*u; V.e.z=60*Math.sin(u*Math.PI/2); V.e.zs=1+.08*u; V.e.sq=1;
           V.e.charge=.6*u; V.e.telegraph=.6+.4*Math.sin(t*Math.PI*6); V.e.ln=.06*u;
         } else {
-          if (!e._fired){ e._fired = true; V.proj={ show:1, x:E_BASE.x+V.e.ox, y:E_BASE.y-150, r:10 };
+          if (!e._fired){ e._fired = true; AudioSys.sfx("eProj"); V.proj={ show:1, x:E_BASE.x+V.e.ox, y:E_BASE.y-150, r:10 };
             ringFx(E_BASE.x+V.e.ox, E_BASE.y-120, "rgba(180,120,255,.75)"); burst(E_BASE.x+V.e.ox, E_BASE.y-140, 8, "#b58ae8", 2, .8); }
           const u=Math.min(1,(t-.36)/.5);
           V.proj.x = E_BASE.x+V.e.ox + (P_BASE.x-(E_BASE.x+V.e.ox))*u;
@@ -1876,7 +1883,7 @@ function buildAtkEvent(e){
   if (e.style === "slam"){
     const hop = SLAM_HOP[E.type] || 40;
     return { dur:820,
-      start:()=>{ V.e.telegraph = 1; },
+      start:()=>{ AudioSys.sfx("eSlamUp"); V.e.telegraph = 1; },
       update:t=>{
         if (t < .14){ const u=t/.14; V.e.ox=10*u; V.e.sq=1-.22*u; V.e.zs=1+.05*u; V.e.rot=.1*u; V.e.z=0;
           V.e.telegraph=.5+.5*Math.sin(t*Math.PI*8); V.e.ln=-.2*u; }
@@ -1897,7 +1904,7 @@ function buildAtkEvent(e){
       }, end:()=>{ V.e.telegraph=0; rest(); } };
   }
   if (e.style === "sweep"){
-    return { dur:560, update:t=>{
+    return { dur:560, start:()=>{ AudioSys.sfx("eSweep"); }, update:t=>{
         if (t < .34){ const u=t/.34; V.e.ox=10*u; V.e.rot=.22*u; V.e.sq=1-.05*u; V.e.ln=-.18*u; }
         else if (t < .58){ const u=(t-.34)/.24;
           V.e.ox=10*(1-u)-D*u; V.e.rot=.22-.5*u; V.e.zs=1+.1*u; V.e.z=6*Math.sin(u*Math.PI); V.e.sq=1; V.e.ln=-.18+.5*u; }
@@ -1907,7 +1914,7 @@ function buildAtkEvent(e){
       }, end:rest };
   }
   if (e.style === "dash"){
-    return { dur:420, update:t=>{
+    return { dur:420, start:()=>{ AudioSys.sfx("eDash"); }, update:t=>{
         if (t < .12){ const u=t/.12; V.e.ox=10*u; V.e.rot=.1*u; V.e.sq=1-.1*u; V.e.ln=-.14*u; }
         else if (t < .46){ const u=(t-.12)/.34;
           V.e.ox=10*(1-u)-D*u; V.e.rot=.1-.34*u; V.e.zs=1+.16*u; V.e.z=8*Math.sin(u*Math.PI); V.e.sq=1; V.e.ln=-.14+.5*u; }
@@ -1919,7 +1926,7 @@ function buildAtkEvent(e){
       }, end:rest };
   }
   if (e.style === "spin"){ // 旋风斩：双周旋转逼近（旋转角终点与起始同相位，归位无跳变）
-    return { dur:760, update:t=>{
+    return { dur:760, start:()=>{ AudioSys.sfx("eSpin"); }, update:t=>{
         if (t < .16){ const u=t/.16; V.e.ox=12*u; V.e.rot=.3*u; V.e.sq=1-.08*u; V.e.ln=-.1*u; }
         else if (t < .72){ const u=(t-.16)/.56;
           V.e.ox=12*(1-u)-D*.55*u;
@@ -1931,7 +1938,7 @@ function buildAtkEvent(e){
       }, end:rest };
   }
   if (e.style === "pounce"){ // 扑咬：压低身体 → 高弧线跃扑 → 砸落
-    return { dur:840, update:t=>{
+    return { dur:840, start:()=>{ AudioSys.sfx("ePounce"); }, update:t=>{
         if (t < .2){ const u=t/.2; V.e.sq=1-.3*u; V.e.rot=.2*u; V.e.ox=-6*u; V.e.zs=1+.04*u; V.e.ln=-.22*u; }
         else if (t < .78){ const u=(t-.2)/.58;
           V.e.ox=-6*(1-u)-D*1.08*u;
@@ -1946,7 +1953,7 @@ function buildAtkEvent(e){
       }, end:rest };
   }
   if (e.style === "submerge"){ // 影遁：潜入地面 → 贴地滑行 → 玩家脚下爆发突袭
-    return { dur:900, start:()=>{ V.e.telegraph = 1; },
+    return { dur:900, start:()=>{ AudioSys.sfx("eSubmerge"); V.e.telegraph = 1; },
       update:t=>{
         if (t < .22){ const u=t/.22; V.e.sq=1-.7*u; V.e.z=-34*u; V.e.rot=.15*u; V.e.ox=-10*u; V.e.visible=1-.75*u; }
         else if (t < .55){ const u=(t-.22)/.33;
@@ -1960,7 +1967,7 @@ function buildAtkEvent(e){
       }, end:()=>{ V.e.telegraph=0; V.e.visible=1; rest(); } };
   }
   if (e.style === "roll"){ // 磐岩滚压：蜷成岩球双周旋转碾过
-    return { dur:880, start:()=>{ V.e.telegraph = 1; },
+    return { dur:880, start:()=>{ AudioSys.sfx("eRoll"); V.e.telegraph = 1; },
       update:t=>{
         if (t < .18){ const u=t/.18; V.e.sq=1-.45*u; V.e.ox=8*u; V.e.rot=.2*u; V.e.zs=1+.05*u;
           V.e.telegraph=.5+.5*Math.sin(t*Math.PI*7); }
@@ -1973,14 +1980,14 @@ function buildAtkEvent(e){
       }, end:()=>{ V.e.telegraph=0; rest(); } };
   }
   if (e.style === "ascend"){ // 末日咒术：升空悬浮 → 天降咒束砸中玩家
-    return { dur:1150, start:()=>{ V.e.telegraph = 1; V.cz = 1.06; V.dim = Math.max(V.dim, .3); },
+    return { dur:1150, start:()=>{ AudioSys.sfx("eAscend"); V.e.telegraph = 1; V.cz = 1.06; V.dim = Math.max(V.dim, .3); },
       update:t=>{
         if (t < .38){ const u=t/.38;
           V.e.z=128*Math.sin(u*Math.PI/2); V.e.zs=1+.1*u; V.e.sq=1-.06*u; V.e.ox=-24*u;
           V.e.charge=.7*u; V.e.telegraph=.7+.3*Math.sin(t*Math.PI*8); V.e.ln=.05*u;
         } else if (t < .58){ const u=(t-.38)/.2;
           V.e.z=128; V.e.zs=1.1; V.e.charge=.7+.3*u; V.e.ln=.05-.2*u;
-          if (u >= .5 && !e._fired){ e._fired = true; V.proj={ show:1, x:P_BASE.x, y:36, r:13 }; V.cz = 1.14; }
+          if (u >= .5 && !e._fired){ e._fired = true; AudioSys.sfx("eBeam"); V.proj={ show:1, x:P_BASE.x, y:36, r:13 }; V.cz = 1.14; }
         } else if (t < .78){ const u=(t-.58)/.2;
           if (V.proj.show){ V.proj.y = 36 + (P_BASE.y-52-36)*u; }
           if (u >= 1){ V.proj.show=0;
@@ -1994,7 +2001,7 @@ function buildAtkEvent(e){
       }, end:()=>{ V.proj.show=0; V.e.telegraph=0; V.e.charge=0; rest(); } };
   }
   if (e.style === "pulse"){ // 汲取之爪：悬浮牵引，双环吸血
-    return { dur:800, start:()=>{ ringFx(E_BASE.x, E_BASE.y-70, "rgba(255,120,150,.7)"); },
+    return { dur:800, start:()=>{ AudioSys.sfx("ePulse"); ringFx(E_BASE.x, E_BASE.y-70, "rgba(255,120,150,.7)"); },
       update:t=>{
         if (t < .3){ const u=t/.3; V.e.z=38*Math.sin(u*Math.PI/2); V.e.ox=-D*.4*u; V.e.zs=1+.05*u; V.e.rot=-.06*u; V.e.ln=.22*u; }
         else if (t < .62){ const u=(t-.3)/.32;
@@ -2005,7 +2012,7 @@ function buildAtkEvent(e){
       }, end:rest };
   }
   // lunge（默认突刺）
-  return { dur:520, update:t=>{
+  return { dur:520, start:()=>{ AudioSys.sfx("eLunge"); }, update:t=>{
       if (t < .18){ const u=t/.18; V.e.ox=16*u; V.e.rot=.14*u; V.e.sq=1-.08*u; V.e.ln=-.16*u; }
       else if (t < .58){ const u=(t-.18)/.4;
         V.e.ox=16*(1-u)-D*u; V.e.rot=.14-.3*u; V.e.zs=1+.12*u; V.e.z=10*Math.sin(u*Math.PI); V.e.sq=1; V.e.ln=-.16+.48*u; }
@@ -2079,30 +2086,31 @@ function enemyPhase(){
 
   runSeq(evs.map(e => {
     if (e.phaseMsg !== undefined) return { dur:600, start:()=>{
+        AudioSys.sfx("ePhase");
         sysLog(e.phaseMsg); V.e.aura = 1; V.shake = 12; V.cz = 1.1;
         burst(E_BASE.x, E_BASE.y-80, 24, "#ff6a6a", 2.8, 1.5);
         floatText(E_BASE.x, E_BASE.y-170, "PHASE UP", "#ff9c9c", 24, { big:true });
       }, update:t=>{ V.e.aura = 0.6+0.4*Math.sin(t*Math.PI);
         V.e.z = 52*Math.sin(t*Math.PI); V.e.rot = .4*Math.sin(t*Math.PI*2);
         V.e.zs = 1+.09*Math.sin(t*Math.PI); V.e.sq = 1-.08*Math.sin(t*Math.PI); V.e.ln = .15*Math.sin(t*Math.PI); } };
-    if (e.charge) return { dur:520, start:()=>{ addLog(`${tag()}<b>${E.name}</b> ${e.msg}`); V.e.charge = 0.1; V.e.telegraph = 1; }, update:t=>{ V.e.charge = 0.1+0.9*t; V.e.telegraph = 0.6+0.4*Math.sin(t*Math.PI*4); V.e.z = 12*Math.sin(t*Math.PI/2); V.e.zs = 1+0.03*t; V.e.ln = -.12*t; }, end:()=>{ V.e.z=0; V.e.zs=1; V.e.ln=0; } };
-    if (e.reshield) return { dur:420, start:()=>{
+    if (e.charge) return { dur:520, start:()=>{ AudioSys.sfx("eCharge"); addLog(`${tag()}<b>${E.name}</b> ${e.msg}`); V.e.charge = 0.1; V.e.telegraph = 1; }, update:t=>{ V.e.charge = 0.1+0.9*t; V.e.telegraph = 0.6+0.4*Math.sin(t*Math.PI*4); V.e.z = 12*Math.sin(t*Math.PI/2); V.e.zs = 1+0.03*t; V.e.ln = -.12*t; }, end:()=>{ V.e.z=0; V.e.zs=1; V.e.ln=0; } };
+    if (e.reshield) return { dur:420, start:()=>{ AudioSys.sfx("eShield");
         const add = Math.round(E.maxshield*e.reshield);
         E.shield = Math.min(E.maxshield, E.shield+add);
         addLog(`${tag()}<b>${E.name}</b> ${e.msg} <span class="heal">+${add}</span>`);
         burst(E_BASE.x, E_BASE.y-70, 12, "#b3a1e8", 1.8, 1);
       } };
-    if (e.regen) return { dur:380, start:()=>{
+    if (e.regen) return { dur:380, start:()=>{ AudioSys.sfx("eHeal");
         const add = Math.round(E.maxhp*e.regen);
         E.hp = Math.min(E.maxhp, E.hp+add);
         addLog(`${tag()}<b>${E.name}</b> 再生 <span class="heal">+${add}</span>`);
         floatText(E_BASE.x, E_BASE.y-150, `+${add}`, "#7fd8a0", 16);
       } };
-    if (e.defendMsg) return { dur:420, start:()=>{
+    if (e.defendMsg) return { dur:420, start:()=>{ AudioSys.sfx("eDefend");
         addLog(`${tag()}<b>${E.name}</b> ${e.defendMsg}`);
         ringFx(E_BASE.x, E_BASE.y-60, "rgba(150,160,200,.7)");
       } };
-    if (e.debuff) return { dur:480, start:()=>{
+    if (e.debuff) return { dur:480, start:()=>{ AudioSys.sfx("eCurse");
         const p = S.p;
         if (p.debuffs.vuln < DEBUFFS.vuln.max) p.debuffs.vuln++;
         addLog(`${tag()}<b>${E.name}</b> 使用 <b>${e.debuff}</b> → 玩家获得 <span class="dmg">易伤</span>（受伤 +30%）`);
@@ -2124,9 +2132,11 @@ function enemyHit(mult, name, ranged, drain, keepDodge){
   V.p.ln = -0.15; V.p.sw = .55; V.p.ba = .35;  // 受击踉跄：后仰+手臂张摆
   final = Math.round(final * STANCES[meta.stance].taken);
   if (p.dodgeBuff){ final = 0; note = `<span class="heal">被闪避！</span>`;
+    AudioSys.sfx("miss");
     floatText(P_BASE.x, P_BASE.y-140, "MISS", "#7fd8a0", 20); }
   else if (p.guard){
     final = Math.round(base*.3*STANCES[meta.stance].taken); note = "格挡减伤 70%"; V.p.block = 1;
+    AudioSys.sfx("blocked");
     if (hasRelic("thorn")){
       const ref = Math.round(base*.3);
       E.hp = Math.max(0, E.hp-ref);
@@ -2138,6 +2148,7 @@ function enemyHit(mult, name, ranged, drain, keepDodge){
   }
   if (final > 0){
     p.hp = Math.max(0, p.hp-final);
+    if (!p.guard) AudioSys.sfx(ranged ? "hurtMagic" : "hurt");
     V.shake = ranged?8:10;
     if (!ranged){
       slashTrail.push({ x:P_BASE.x+14, y:P_BASE.y-66, r:44, a0:-2.7, a1:-.3, color:"#ff8a70", life:.9 });
@@ -2515,7 +2526,7 @@ E = { type:"guard", name:"-", desc:"", maxhp:1, hp:1, poise:1, maxpoise:1, atk:0
       lifesteal:0, blink:0, thorns:0, swift:false, debuffOnHit:false, affix:null, affixName:"" };
 /* ==================== 程序化音乐系统（WebAudio 合成 · 无外部音频资源） ==================== */
 const AudioSys = (()=>{
-  let actx=null, masterG=null, musicBus=null, timer=0;
+  let actx=null, masterG=null, musicBus=null, sfxBus=null, timer=0;
   const MUTE_KEY="corridor_music_v1";
   let muted = localStorage.getItem(MUTE_KEY)==="1";
   let want = null;                 // 最近期望曲目（静音解除后续播）
@@ -2549,6 +2560,7 @@ const AudioSys = (()=>{
       actx = new AC();
       masterG = actx.createGain(); masterG.gain.value = muted?0:1; masterG.connect(actx.destination);
       musicBus = actx.createGain(); musicBus.gain.value = .9; musicBus.connect(masterG);
+      sfxBus = actx.createGain(); sfxBus.gain.value = .85; sfxBus.connect(masterG);
     }
     if (actx.state === "suspended") actx.resume();
     return actx;
@@ -2745,6 +2757,139 @@ const AudioSys = (()=>{
     live.push({ kind:"jingle", gain:g, removeAt:t0+dur+.4 });
     startTimer();
   }
+  /* ==================== 战斗音效 SFX（按攻击模式分别合成） ==================== */
+  const lastSfx = {};
+  // 滑音振荡器
+  function nt(fr0,fr1,t0,dur,peak,otype,dest){
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.type=otype||"triangle";
+    o.frequency.setValueAtTime(fr0,t0);
+    if(fr1) o.frequency.exponentialRampToValueAtTime(Math.max(20,fr1),t0+dur);
+    g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(peak,t0+.006);
+    g.gain.exponentialRampToValueAtTime(.0006,t0+dur);
+    o.connect(g); g.connect(dest||sfxBus); o.start(t0); o.stop(t0+dur+.04);
+  }
+  // 滤波噪声（风声/爆裂/金属）
+  function nz(t0,dur,type,f0,f1,peak,q,dest){
+    const len=Math.max(.02,dur);
+    const buf=actx.createBuffer(1,Math.ceil(actx.sampleRate*len),actx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length);
+    const s=actx.createBufferSource(); s.buffer=buf;
+    const f=actx.createBiquadFilter(); f.type=type; f.Q.value=q||.8;
+    f.frequency.setValueAtTime(f0,t0);
+    if(f1) f.frequency.exponentialRampToValueAtTime(Math.max(40,f1),t0+dur);
+    const g=actx.createGain(); g.gain.value=peak;
+    s.connect(f); f.connect(g); g.connect(dest||sfxBus); s.start(t0);
+  }
+  // 低频冲击（砸落/轰鸣）
+  function boom(t0,dur,f0,f1,peak,dest){
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.type="sine"; o.frequency.setValueAtTime(f0,t0);
+    o.frequency.exponentialRampToValueAtTime(f1,t0+dur);
+    g.gain.setValueAtTime(peak,t0); g.gain.exponentialRampToValueAtTime(.0008,t0+dur);
+    o.connect(g); g.connect(dest||sfxBus); o.start(t0); o.stop(t0+dur+.04);
+  }
+  const SFX = {
+    /* ---- 玩家：轻击（火·双段斩） ---- */
+    swingL(){ const t=actx.currentTime;
+      nz(t,.13,"bandpass",1500,3800,.13,1.2); nz(t,.10,"highpass",2600,4200,.045); },
+    swingL2(){ const t=actx.currentTime; nz(t,.10,"bandpass",2100,4400,.11,1.3); },
+    hitFire(o){ const t=actx.currentTime, c=o&&o.crit;
+      nz(t,c?.12:.09,"lowpass",1400,500,c?.26:.2); nt(720,240,t,c?.12:.08,c?.18:.15,"triangle");
+      nz(t,.07,"highpass",2200,3600,.05);                       // 火焰嘶声
+      if(c){ nt(1720,1080,t+.01,.18,.085,"sine"); boom(t,.14,150,48,.22); } },
+    hitFireS(){ const t=actx.currentTime;                     // 反手二段
+      nz(t,.06,"lowpass",1100,600,.12); nt(580,300,t,.05,.085,"triangle"); },
+    /* ---- 玩家：重击（雷·跳劈） ---- */
+    chargeH(){ const t=actx.currentTime;
+      nt(70,132,t,.26,.09,"sawtooth"); nt(105,198,t,.26,.045,"sawtooth"); },
+    swingH(){ const t=actx.currentTime;
+      nz(t,.30,"bandpass",700,2400,.14,.9);
+      nz(t+.11,.18,"bandpass",1200,3100,.09,1.1); },
+    hitThunder(o){ const t=actx.currentTime, c=o&&o.crit;
+      boom(t,c?.42:.3,c?130:110,32,c?.38:.32);
+      nz(t,c?.3:.2,"lowpass",1000,280,c?.26:.2);
+      nz(t,.06,"highpass",3600,5000,.13);                     // 电裂
+      nt(300,90,t,.12,.09,"triangle");
+      if(c){ nt(2200,1400,t,.2,.07,"sine"); } },
+    /* ---- 玩家：处决（暗·四段演出） ---- */
+    execCharge(){ const t=actx.currentTime;
+      nt(58,46,t,.30,.09,"sawtooth"); nt(116,90,t,.30,.05,"sine");
+      nz(t,.25,"lowpass",520,240,.05); },
+    execDash(){ const t=actx.currentTime;
+      nz(t,.20,"bandpass",500,3300,.13,1.1); nt(180,780,t,.16,.07,"sawtooth"); },
+    execHit(){ const t=actx.currentTime;
+      boom(t,.42,96,27,.4); nz(t,.32,"lowpass",820,180,.22);
+      nt(1320,480,t,.34,.07,"sine"); nz(t,.14,"highpass",2400,5000,.07); },
+    /* ---- 玩家：终结技（4× 跳劈） ---- */
+    finCharge(){ const t=actx.currentTime;
+      nt(92,250,t,.50,.11,"sawtooth"); nt(138,375,t,.50,.05,"sawtooth"); },
+    finSwing(){ const t=actx.currentTime;
+      nz(t,.24,"bandpass",600,2900,.14,1.0); nz(t+.08,.12,"bandpass",1400,3300,.07,1.2); },
+    finHit(){ const t=actx.currentTime;
+      boom(t,.50,132,30,.42); nz(t,.40,"lowpass",1200,220,.24);
+      nt(1568,1046,t,.50,.085,"sine"); nt(2093,1568,t+.02,.30,.04,"sine"); },
+    /* ---- 玩家：格挡 / 闪避 / 药剂 / 受击 ---- */
+    guardUp(){ const t=actx.currentTime;
+      nt(430,700,t,.08,.075,"triangle"); nz(t,.06,"highpass",4000,5200,.06); },
+    blocked(){ const t=actx.currentTime;
+      nz(t,.08,"highpass",3200,5200,.13); nt(2420,1680,t+.005,.14,.09,"sine"); nt(3640,2520,t+.005,.09,.045,"sine"); },
+    dodge(){ const t=actx.currentTime; nz(t,.17,"bandpass",900,3500,.12,1.3); },
+    miss(){ const t=actx.currentTime; nz(t,.20,"bandpass",2300,850,.085,.9); },
+    potion(){ const t=actx.currentTime;
+      nt(660,660,t,.12,.075,"sine"); nt(990,990,t+.13,.24,.085,"sine"); },
+    blink(){ const t=actx.currentTime;
+      nt(1400,300,t,.14,.085,"sine"); nz(t,.08,"highpass",4000,5600,.055); },
+    hurt(){ const t=actx.currentTime;
+      nz(t,.13,"lowpass",1100,380,.2); nt(240,88,t,.17,.11,"sawtooth"); },
+    hurtMagic(){ const t=actx.currentTime;
+      nt(500,150,t,.20,.13,"sawtooth"); nz(t,.20,"bandpass",1800,560,.13); boom(t,.18,100,38,.15); },
+    /* ---- 敌人：起手音（按招式风格） ---- */
+    eLunge(){ const t=actx.currentTime; nz(t,.12,"bandpass",1300,2900,.09,1.0); },
+    eSlamUp(){ const t=actx.currentTime; boom(t,.12,100,58,.13); nz(t,.12,"lowpass",620,300,.07); },
+    eSweep(){ const t=actx.currentTime;
+      nz(t,.32,"bandpass",700,2500,.11,.8); nz(t+.14,.16,"bandpass",1000,2700,.06,.9); },
+    eDash(){ const t=actx.currentTime; nz(t,.16,"bandpass",1000,3400,.10,1.2); },
+    eSpin(){ const t=actx.currentTime;
+      nz(t,.30,"bandpass",900,2600,.07,.9); nz(t+.26,.30,"bandpass",2600,900,.07,.9); },
+    ePounce(){ const t=actx.currentTime;
+      nt(120,54,t,.30,.11,"sawtooth"); nz(t,.26,"bandpass",800,2300,.11,1.0); },
+    eSubmerge(){ const t=actx.currentTime; nz(t,.22,"lowpass",720,140,.11); },
+    eStrike(){ const t=actx.currentTime;
+      nz(t,.16,"bandpass",600,3100,.13,1.1); boom(t,.14,110,48,.14); },
+    eRoll(){ const t=actx.currentTime;
+      nt(48,40,t,.55,.09,"sawtooth"); nz(t,.55,"lowpass",330,140,.13); nz(t,.30,"lowpass",700,300,.06); },
+    eCast(){ const t=actx.currentTime;
+      nt(440,890,t,.34,.08,"triangle"); nt(446,898,t,.34,.04,"triangle");
+      nz(t,.10,"highpass",3000,4600,.04); },
+    eProj(){ const t=actx.currentTime; nt(1200,680,t,.22,.045,"sine"); },
+    eAscend(){ const t=actx.currentTime;
+      nt(52,122,t,.55,.12,"sawtooth"); nt(78,183,t,.55,.05,"sawtooth"); nz(t,.50,"lowpass",520,280,.07); },
+    eBeam(){ const t=actx.currentTime; nz(t,.30,"bandpass",2500,480,.12,1.0); boom(t,.16,90,36,.12); },
+    ePulse(){ const t=actx.currentTime;
+      nt(300,168,t,.40,.08,"sawtooth"); nt(452,252,t,.40,.035,"sine"); },
+    eCharge(){ const t=actx.currentTime;
+      nt(62,142,t,.50,.09,"sawtooth"); nt(93,213,t,.50,.04,"sawtooth"); nz(t,.45,"lowpass",600,300,.05); },
+    eShield(){ const t=actx.currentTime;
+      nt(880,1320,t,.28,.075,"sine"); nt(1320,1760,t+.02,.20,.035,"sine"); },
+    eHeal(){ const t=actx.currentTime; nt(520,785,t,.26,.06,"sine"); },
+    eDefend(){ const t=actx.currentTime;
+      nt(320,180,t,.18,.06,"triangle"); nz(t,.07,"highpass",2600,4200,.045); },
+    eCurse(){ const t=actx.currentTime;
+      nt(400,170,t,.25,.075,"sawtooth"); nz(t,.12,"highpass",2800,4400,.04); },
+    ePhase(){ const t=actx.currentTime;
+      boom(t,.32,150,46,.26); nz(t,.22,"lowpass",1400,400,.12); nt(330,110,t,.25,.07,"sawtooth"); },
+  };
+  function sfx(name, opts){
+    if(muted) return;
+    if(!ensure()) return;
+    const now=actx.currentTime;
+    if(lastSfx[name] && now-lastSfx[name] < .05) return;   // 同名音效 50ms 节流，防连段机关枪
+    lastSfx[name]=now;
+    const fn=SFX[name]; if(fn) fn(opts||{});
+  }
+
   function toggle(){
     muted=!muted;
     try{ localStorage.setItem(MUTE_KEY,muted?"1":"0"); }catch(e){}
@@ -2762,7 +2907,7 @@ const AudioSys = (()=>{
   },{ once:false });
   const btn0=document.getElementById("music-btn");
   if(btn0){ btn0.textContent = muted?"♪ 音乐·关":"♪ 音乐·开"; if(muted) btn0.classList.add("off"); }
-  return { title, battle, jingle, toggle };
+  return { title, battle, jingle, toggle, sfx };
 })();
 
 showMenu();
